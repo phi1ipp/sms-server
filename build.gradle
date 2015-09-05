@@ -1,0 +1,44 @@
+group 'com.grigorio'
+version '1.0-SNAPSHOT'
+
+buildscript {
+    repositories {
+        jcenter()
+    }
+
+    dependencies {
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:1.2.5.RELEASE")
+    }
+}
+apply plugin: 'groovy'
+apply plugin: 'java'
+apply plugin: 'spring-boot'
+apply plugin: 'idea'
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+        // tag::jetty[]
+    compile("org.springframework.boot:spring-boot-starter-web") {
+        exclude module: "spring-boot-starter-tomcat"
+    }
+    compile("org.springframework.boot:spring-boot-starter-jetty")
+    // end::jetty[]
+    // tag::actuator[]
+    compile("org.springframework.boot:spring-boot-starter-actuator")
+    // end::actuator[]
+    compile 'org.apache.logging.log4j:log4j-core:2.3'
+    compile 'commons-net:commons-net:3.3'
+    compile 'commons-codec:commons-codec:1.10'
+    testCompile 'org.springframework:spring-test:4.1.7.RELEASE'
+
+    compile 'org.codehaus.groovy:groovy-all:2.3.11'
+    compile files('libs/smslib-3.5.4.jar')
+
+    testCompile("junit:junit")
+}
