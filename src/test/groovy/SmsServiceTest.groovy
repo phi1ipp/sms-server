@@ -49,7 +49,26 @@ class SmsServiceTest {
     }
 
     @Test
+    void testReadSmsList() {
+        println service.readSMSList(0)
+    }
+    @Test
     void testGetNewSms() {
         println service.getNewSms(0)
+    }
+
+    @Test
+    void testSendSms() {
+        service.sendSms('+79175685589', 'Проверка связи')
+    }
+
+    @Test
+    void testSendMultiSms() {
+        service.sendSms('+79175685589', 'Поскольку во всех предыдущих погружениях мы обнаруживали Призраков лишь по счастливой случайности, то я прошу всех присутствующих быть предельно внимательными и сообщать мне обо всех необычных явлениях.')
+    }
+
+    @Test
+    void testSendMultiSms2() {
+        service.sendSms('+14692379239', 'Поскольку во всех предыдущих погружениях мы обнаруживали Призраков лишь по счастливой случайности,')
     }
 }

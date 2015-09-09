@@ -1,7 +1,10 @@
 import com.grigorio.smsserver.domain.Sms
 import com.grigorio.smsserver.exception.SmsException
 import org.ajwcc.pduUtils.gsm3040.PduParser
+import org.ajwcc.pduUtils.gsm3040.SmsStatusReportPdu
 import org.junit.Test
+import org.smslib.Message
+import org.smslib.OutboundMessage
 
 class SmsTest {
     def simpleSms = '07919761989901F0040B919771655885F900085190404191522118041F0440043E04410442043E002004420435044104420020'
@@ -74,6 +77,39 @@ class SmsTest {
         }
     }
 
+    @Test
+    void testToRawPdu() {
+        def msg = 'Прингл время от времени кивал круглой головой, фарфоровое сверкание меж складчатых губ выдавало сильное возбуждение.'
+        def smsc = '+79262909090'
+
+        def str = new Sms('+14692379239', msg).toRawPdu(smsc)
+
+        str.each {
+            String[] parts = it.split(',')
+
+            assert Sms.getChecksum(parts[1]) == (Integer.valueOf(parts[2], 16) & 0xff) as byte
+            assert Sms.getLength(parts[1]) == Integer.valueOf(parts[0])
+        }
+
+        println str
+    }
+
+    @Test
+    void testToRawPduValidity() {
+        def msg = 'Прингл время от времени кивал круглой головой, фарфоровое сверкание меж складчатых губ выдавало сильное возбуждение.'
+        def smsc = '+79262909090'
+
+        def str = new Sms('+14692379239', msg).valid(1).toRawPdu(smsc)
+
+        str.each {
+            String[] parts = it.split(',')
+
+            assert Sms.getChecksum(parts[1]) == (Integer.valueOf(parts[2], 16) & 0xff) as byte
+            assert Sms.getLength(parts[1]) == Integer.valueOf(parts[0])
+        }
+
+        println str
+    }
     void testPdu() {
         println new PduParser().parsePdu(part1).mpRefNo
         println new PduParser().parsePdu(part1).mpMaxNo
@@ -92,5 +128,22 @@ class SmsTest {
         println new PduParser().parsePdu(part4).mpSeqNo
 
         println new PduParser().parsePdu(invPart).mpRefNo
+    }
+
+    @Test
+    void testDeliverReport() {
+        def pdu = '07919762020033F106920B919771655885F9519070021333215190700213532100FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF'
+        def pd = new PduParser().parsePdu(pdu)
+        if (pd instanceof SmsStatusReportPdu)
+            println "status=$pd.status time=$pd.dischargeTime"
+
+    }
+    @Test
+    void testSmsPdus() {
+        OutboundMessage msg = new OutboundMessage('+14692379239', 'Проверка телефона')
+        msg.setEncoding(Message.MessageEncodings.ENCUCS2)
+        msg.setValidityPeriod(60)
+
+        println msg.getPdus('+79262909090', 1)
     }
 }

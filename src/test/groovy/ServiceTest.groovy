@@ -6,6 +6,12 @@ import org.smslib.OutboundMessage
 import org.smslib.Service
 import org.apache.commons.codec.binary.Hex
 
+import java.sql.Timestamp
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.ZonedDateTime
+
 class ServiceTest {
     @Test
     void aGetService() {
@@ -17,6 +23,7 @@ class ServiceTest {
     void getPDU() {
         OutboundMessage msg = new OutboundMessage('79168492412', 'Привет, Джавдед, как дела?')
         msg.setEncoding(Message.MessageEncodings.ENCUCS2)
+        msg.setFlashSms(false)
         String[] strPDU = msg.getPdus('+79262909090', 2)
 
         strPDU.each {println "PDU:${it} Length:${Integer.toHexString(getLength(it))}"}
@@ -45,38 +52,15 @@ class ServiceTest {
 
     @Test
     void parseSMS() {
-        String str = '07919761989901F0440B919771655885F90008519040616515218C05000319040104210443044904350441044204320443043504420020044304410442043E0439044704380432044B04390020043C043804440020043E0020043A04300447043504410442043204350020043E0431044004300437043E04320430043D0438044F0020043200200410043D0433043B04380438002E0020041D04350020044104420430043D0443'
-
-        assert Integer.toHexString(getChecksum(str) & 0xff) == 'c3'
-        assert getLength(str) != 159
+        String str = '07919762929090F051000B914196329732F90008FF8C050003E90201041F043E0441043A043E043B044C043A044300200432043E002004320441043504450020043F044004350434044B043404430449043804450020043F043E04330440044304360435043D0438044F04450020043C044B0020043E0431043D0430044004430436043804320430043B04380020041F04400438043704400430043A043E04320020'
 
         Pdu pdu = new PduParser().parsePdu(str)
-        println pdu.concatInfo
-        println pdu.getDecodedText()
+        println pdu
 
-        str = '07919761989901F0440B919771655885F90008519040616585218C0500031904020020044D0442043E0433043E0020043E044204400438044604300442044C0020002D0020043A0430044704350441044204320435043D043D043E04350020043E0431044004300437043E04320430043D0438044F0020043200200410043D0433043B043804380020043D04350441043E043C043D0435043D043D043E0020043504410442044C'
-
-        assert Integer.toHexString(getChecksum(str) & 0xff) == '77'
-        assert getLength(str) != 159
+        str = '07919762929090F051000B914196329732F90008FF44050003E90202043B04380448044C0020043F043E002004410447043004410442043B04380432043E043900200441043B0443044704300439043D043E044104420438002C'
 
         pdu = new PduParser().parsePdu(str)
-        println pdu.concatInfo
-        println pdu.getDecodedText()
-
-        str = '07919761989901F0440B919771655885F90008519040617540218C050003190403002C00200432043E044200200442043E043B044C043A043E0020043E043D043E002004410430043C043E002C002004320020043E0442043B04380447043804380020043C0438044404300020043E0020043D0435043C002C0020002D00200441043E043204410435043C0020043D043500200434043B044F00200434043B044F002004320441'
-
-        assert Integer.toHexString(getChecksum(str) & 0xff) == '83'
-        assert getLength(str) != 159
-
-        pdu = new PduParser().parsePdu(str)
-        println pdu.concatInfo
-        println pdu.getDecodedText()
-
-        str = '07919761989901F0440B919771655885F90008519040617511210E05000319040404350445002E0020'
-
-        pdu = new PduParser().parsePdu(str)
-        println pdu.concatInfo
-        println pdu.getDecodedText()
+        println pdu
     }
 
     int getLength(String str) {
@@ -98,10 +82,18 @@ class ServiceTest {
         return cs
     }
 
-
     @Test
     void slice() {
-        def m = [1:2, 2:2, 3:3]
-        println m
+        Date dt = new Date()
+        Instant instant = Instant.from(LocalDateTime.now().atZone(ZoneId.systemDefault()))
+        Timestamp ts = Timestamp.from(instant)
+        println ts
+    }
+
+    @Test
+    void staticVar() {
+        for (int i = 0; i < 10; i++) {
+            println new Random().nextInt(2)
+        }
     }
 }
