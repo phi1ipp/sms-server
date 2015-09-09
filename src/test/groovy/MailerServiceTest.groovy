@@ -1,6 +1,5 @@
 import com.grigorio.smsserver.config.MailerServiceConfig
 import com.grigorio.smsserver.service.MailerService
-import org.junit.After
 import org.junit.Before
 import org.junit.Test
 

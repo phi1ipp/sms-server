@@ -39,10 +39,10 @@ class SmsService {
         return readSMSList(channel).size() > 0
     }
 
-    void sendSms(String addr, String txt) {
+    void sendSms(Sms sms) {
         int channel = selectChannel()
 
-        List<String> pdus = new Sms(addr, txt).toRawPdu(cfg.smsc)
+        List<String> pdus = sms.toRawPdu(cfg.smsc)
 
         try {
             telnetService.write 'at!g=a6'
@@ -62,6 +62,10 @@ class SmsService {
             telnetService.write 'at!g=55'
             log.debug telnetService.readUntil(OK)
         }
+    }
+
+    void sendSms(String addr, String txt) {
+        sendSms(new Sms(addr, txt))
     }
 
     List<Sms> getNewSms(int channel) {
