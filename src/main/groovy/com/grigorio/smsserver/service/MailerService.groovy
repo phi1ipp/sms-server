@@ -43,8 +43,8 @@ class MailerService {
             throw new MailerServiceException(noConfig)
 
         Properties props = new Properties()
-        props.setProperty('mail.pop3.host', cfg.server)
-        props.setProperty('mail.pop3.port', cfg.port as String)
+        props.setProperty('mail.imap.host', cfg.server)
+        props.setProperty('mail.imap.port', cfg.port as String)
 
         log.trace 'getting session'
         session = Session.getInstance(props, new Authenticator() {
@@ -55,7 +55,7 @@ class MailerService {
         })
 
         log.trace 'getting store'
-        store = session.getStore('pop3')
+        store = session.getStore('imap')
 
         log.trace 'connecting to store'
         store.connect()
@@ -106,7 +106,7 @@ class MailerService {
     }
 
     List<Sms> getSmsList() {
-        log.trace '>> getSmsMessages'
+        log.trace '>> getSmsList'
 
         List<Sms> res = new ArrayList<>()
 

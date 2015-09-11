@@ -1,6 +1,7 @@
 package com.grigorio.smsserver.service
 
 import com.grigorio.smsserver.domain.Sms
+import com.grigorio.smsserver.repository.SmsRepository
 import groovy.util.logging.Slf4j
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.scheduling.annotation.Scheduled
@@ -15,6 +16,9 @@ class SchedulerService {
     @Autowired
     SmsService smsService
 
+    @Autowired
+    SmsRepository smsRepository
+
     @Scheduled(fixedDelay = 30000l)
     void checkInboxAndSend() {
         log.trace '>> checkInboxAndSend'
@@ -26,6 +30,7 @@ class SchedulerService {
         smsList.each {
             log.trace "sending SMS: $it"
             smsService.sendSms(it)
+            smsRepository.save(it)
         }
         log.trace '<< checkInboxAndSend'
     }

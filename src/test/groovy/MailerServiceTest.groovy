@@ -9,7 +9,7 @@ class MailerServiceTest {
     void setup() {
         MailerServiceConfig config = new MailerServiceConfig()
         config.server = '192.168.0.7'
-        config.port = 110
+        config.port = 143
         config.user = 'sms'
         config.password = 'zDf!12gfIUY'
         config.domain = 'icsynergy.com'
