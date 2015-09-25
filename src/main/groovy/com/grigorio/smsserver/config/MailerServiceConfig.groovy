@@ -5,6 +5,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 @ConfigurationProperties(prefix = 'mail')
 class MailerServiceConfig {
     String server, user, password
-    String domain
+    String domain, forward
     Integer port
 }

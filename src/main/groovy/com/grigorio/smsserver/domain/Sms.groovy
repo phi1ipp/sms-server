@@ -4,17 +4,17 @@ import com.grigorio.smsserver.exception.SmsException
 import groovy.util.logging.Slf4j
 import org.ajwcc.pduUtils.gsm3040.Pdu
 import org.ajwcc.pduUtils.gsm3040.PduParser
+import org.ajwcc.pduUtils.gsm3040.SmsDeliveryPdu
+import org.ajwcc.pduUtils.gsm3040.SmsStatusReportPdu
 import org.apache.commons.codec.binary.Hex
 import org.smslib.Message
 import org.smslib.OutboundMessage
 
-import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.GeneratedValue
 import javax.persistence.GenerationType
 import javax.persistence.Id
 import javax.persistence.Transient
-import java.lang.reflect.Field
 import java.time.LocalDateTime
 
 import static com.grigorio.smsserver.exception.SmsException.Reason.*
@@ -27,10 +27,12 @@ class Sms {
     @GeneratedValue(strategy = GenerationType.AUTO)
     long id
 
-    String address, txt, status
+    String address, txt
     LocalDateTime ts
 
     byte refNo
+    char status = 'u'   //undefined
+    boolean incoming = false
 
     @Transient int iValidHours
 
@@ -39,7 +41,7 @@ class Sms {
         this.txt = txt
 
         ts = LocalDateTime.now()
-        refNo = new Random().nextInt()
+        refNo = (new Random().nextInt() & 0xff) as byte
     }
 
     public Sms valid(int iHours) {
@@ -55,11 +57,30 @@ class Sms {
         }
 
         Pdu pdu = new PduParser().parsePdu(rawPdu)
-        if (pdu.concatInfo != null) {
+        if (!pdu instanceof SmsStatusReportPdu && !pdu instanceof SmsDeliveryPdu && pdu.concatInfo != null) {
             throw new SmsException(argMultiPart)
         }
 
-        new Sms(pdu.address, pdu.getDecodedText())
+        if (pdu instanceof SmsDeliveryPdu) {
+            def sms = new Sms(pdu.address, pdu.decodedText)
+            sms.status = 'i'
+            sms
+
+        } else if (pdu instanceof SmsStatusReportPdu) {
+            SmsStatusReportPdu reportPdu = pdu as SmsStatusReportPdu
+
+            char status = 'u'
+
+            switch (reportPdu.status) {
+                case 0 : status = 'd';
+            }
+            def sms = new StatusReportSms(reportPdu.address, status)
+            log.debug "messageReference: ${pdu.messageReference} refNo: ${pdu.mpRefNo}"
+            sms.refNo = (reportPdu.messageReference & 0xff) as byte
+            sms
+
+        } else
+            new Sms(pdu.address, pdu.getDecodedText())
     }
 
     static Sms valueOf(Pdu pdu) {
@@ -104,6 +125,11 @@ class Sms {
         )
     }
 
+    Sms setIncoming(boolean flag) {
+        incoming = flag
+        this
+    }
+
     List<String> toRawPdu(String smsc) {
         log.trace '>> toRawPdu'
 
@@ -129,7 +155,12 @@ class Sms {
 
     @Override
     String toString() {
-        new StringBuilder('SMS[Address: ').append(address).append(' Text: ').append(txt).append(']').toString()
+        new StringBuilder('SMS [Address: ')
+                .append(address).append(' Text: ').append(txt)
+                .append(' ref#: ').append(refNo)
+                .append(' Date: ').append(ts.toString())
+                .append(' Status: ').append(status)
+                .append(']').toString()
     }
 
     static int getLength(String str) {

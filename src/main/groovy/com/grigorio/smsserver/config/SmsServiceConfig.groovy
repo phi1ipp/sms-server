@@ -8,4 +8,5 @@ import org.springframework.stereotype.Component
 class SmsServiceConfig {
     String smsc
     int validHours
+    int[] channels
 }

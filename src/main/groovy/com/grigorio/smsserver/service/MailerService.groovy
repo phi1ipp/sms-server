@@ -17,7 +17,11 @@ import javax.mail.Message
 import javax.mail.PasswordAuthentication
 import javax.mail.Session
 import javax.mail.Store
+import javax.mail.Transport
 import javax.mail.internet.InternetAddress
+import javax.mail.internet.MimeMessage
+import java.util.regex.Matcher
+import java.util.regex.Pattern
 
 import static com.grigorio.smsserver.exception.MailerServiceException.Reason.*
 
@@ -44,6 +48,7 @@ class MailerService {
 
         Properties props = new Properties()
         props.setProperty('mail.imap.host', cfg.server)
+        props.setProperty('mail.smtp.host', cfg.server)
         props.setProperty('mail.imap.port', cfg.port as String)
 
         log.trace 'getting session'
@@ -119,7 +124,7 @@ class MailerService {
 
             log.trace 'getting messages'
             Message[] messages = inbox.getMessages()
-            log.trace "${messages.size()} messages in inbox"
+            log.info "${messages.size()} messages in inbox"
 
             log.trace 'processing messages'
             messages.each {
@@ -131,25 +136,43 @@ class MailerService {
 
                 if (from.endsWith(cfg.domain)) {
                     if (it.isMimeType('text/plain')) {
+
+                        log.debug "content type: ${it.getContentType()}"
+
                         try {
                             String content = it.getContent()
 
-                            Map<String, String> fields = [:]
+                            log.debug "content: $content"
+
 
                             log.trace 'parsing email content'
-                            content.split('\n').each {
-                                line ->
-                                    String[] tokens = line.split('=')
-                                    String k = tokens[0]
-                                    String v = tokens[1]
-                                    fields.put(k, v)
-                            }
-                            log.debug "fields: $fields"
 
+                            Map<String, String> fields = [:]
+                            Pattern pattern = Pattern.compile('mess=(.*)$', Pattern.DOTALL)
+                            Matcher matcher = pattern.matcher(content)
+
+                            if (!matcher.find()) {
+                                log.error "No mess found in the email"
+                                throw new MailerServiceException('No mess found in the email')
+                            }
+
+                            String mess = matcher.group(1)
+
+                            pattern = Pattern.compile 'tels=(.*)'
+                            matcher = pattern.matcher(content)
+
+                            if (!matcher.find()) {
+                                log.error "No tels found in the email"
+                                throw new MailerServiceException('No tels found in the email')
+                            }
+
+                            String tels = matcher.group(1)
+
+                            log.debug "tels=$tels mess=$mess"
                             log.trace 'trying to add sms'
-                            res.add(new Sms(fields['tels'].trim(), fields['mess'].trim()))
+                            res.add(new Sms(tels, mess))
                         } catch (Exception e) {
-                            log.error "Exception processing email from $from: ${e.stackTrace}"
+                            log.error "Exception ${e.cause} processing email from $from: ${e.stackTrace}"
                         }
                     } else {
                         log.warn "Message from $from is not a text message, skipping..."
@@ -171,5 +194,30 @@ class MailerService {
         } finally {
             inbox.close(true)
         }
+    }
+
+    void sendMail(String to, String text) {
+        log.trace '>> sendMail'
+        log.debug "sendMail with $to"
+
+        try {
+            MimeMessage msg = new MimeMessage(session)
+
+            msg.setFrom(new InternetAddress('sms@max-avia.ru'))
+            msg.setRecipient(Message.RecipientType.TO, new InternetAddress(to))
+
+            msg.setSubject('New SMS')
+
+            msg.setText(text)
+
+            Transport.send(msg)
+
+            log.info "Email to $to sent"
+        } catch (Exception e) {
+            log.error("Exception sending mail", e)
+            throw e
+        }
+
+        log.trace '<< sendMail'
     }
 }

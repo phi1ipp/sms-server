@@ -5,5 +5,5 @@ import org.springframework.data.repository.CrudRepository
 
 interface SmsRepository extends CrudRepository<Sms, Long>{
     List<Sms> findByAddress(String addr)
-    List<Sms> findByAddressAndRefNo(String addr, Byte refNo)
+    List<Sms> findByAddressAndRefNoOrderByTsDesc(String addr, Byte refNo)
 }

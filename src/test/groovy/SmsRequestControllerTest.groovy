@@ -36,8 +36,8 @@ class SmsRequestControllerTest {
         mockMvc
                 .perform(
                     get('/send')
-                            .param('phone_list', '+14692379239')
-                            .param('message', 'Раз, два, три - проверка телефона. Три, два, раз - иди-ка братко в Гондурас!')
+                            .param('phone_list', '+79175685589')
+                            .param('message', 'Проверка, проверка...')
                             .param('http_username', 'testUser')
                             .param('http_password', 'testPassword'))
                 .andExpect(status().isOk())

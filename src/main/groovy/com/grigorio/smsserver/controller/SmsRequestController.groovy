@@ -29,7 +29,7 @@ class SmsRequestController {
         log.debug "sendSms: user=$user pwd=$pwd addr=$addr txt=$txt"
 
         log.trace 'sending sms'
-//        service.sendSms(addr, txt)
+        service.sendSms(addr, txt)
         smsRepo.save(new Sms(addr, txt))
 
         log.trace '<< sendSms'

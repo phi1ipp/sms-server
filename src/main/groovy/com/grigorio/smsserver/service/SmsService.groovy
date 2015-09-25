@@ -19,48 +19,44 @@ import org.springframework.beans.factory.annotation.Autowired
 @Service
 @EnableConfigurationProperties(SmsServiceConfig.class)
 class SmsService {
-    static def NL = '\r\n', OK = 'OK' + NL
+    static final private String NL = '\r\n', OK = 'OK'
     @Autowired
     TelnetService telnetService
 
     @Autowired
     SmsServiceConfig cfg
 
-    @PostConstruct
-    void connect() {
-        if (telnetService == null) {
-            throw new SmsServiceException(SmsServiceException.Reason.nullTelnetSvc)
-        }
+    public void sendSms(Sms sms) {
+        log.trace '>> sendSms'
 
-        telnetService.connect()
-    }
-
-    public boolean newSms(int channel) {
-        return readSMSList(channel).size() > 0
-    }
-
-    void sendSms(Sms sms) {
         int channel = selectChannel()
+        log.debug "channel to send: ${channel}"
 
         List<String> pdus = sms.toRawPdu(cfg.smsc)
+        log.debug "pdus to send: $pdus"
 
         try {
-            telnetService.write 'at!g=a6'
-            log.debug telnetService.readUntil(OK)
+            telnetService.connect()
+            telnetService.privMode(true)
 
             pdus.each {
-                telnetService.write "AT^SM=$channel,$it"
-                log.debug telnetService.readUntil(NL)
+                String cmd = "AT^SM=$channel,$it"
+                telnetService.write cmd
+                log.debug telnetService.readUntil(cmd + NL)
 
                 def res = telnetService.readUntil NL
                 log.debug res
 
                 if (res.contains('*smserr'))
                     throw new TelnetServiceException(sendFailed)
+
+                log.trace '<< sendSms'
             }
+        } catch (Exception e) {
+            log.error "Exception sending sms: ${e.stackTrace}"
+            throw e
         } finally {
-            telnetService.write 'at!g=55'
-            log.debug telnetService.readUntil(OK)
+            telnetService.disconnect()
         }
     }
 
@@ -68,22 +64,49 @@ class SmsService {
         sendSms(new Sms(addr, txt))
     }
 
-    List<Sms> getNewSms(int channel) {
+    public List<Sms> getNewSms() {
         log.trace '>> getNewSms'
+        log.debug 'getNewSms w/o params'
 
+        List<Sms> res = []
+        telnetService.connect()
+        telnetService.privMode(true)
+
+        cfg.channels.each {
+            def tmp = getNewSmsFromChannel(it)
+
+            log.debug "list from channel $it: $tmp"
+
+            res.addAll(tmp)
+            log.debug "res: $res"
+        }
+
+        telnetService.privMode(false)
+        telnetService.disconnect()
+
+        log.trace '<< getNewSms'
+        res
+    }
+
+    private List<Sms> getNewSmsFromChannel(int channel) {
+        log.trace '>> getNewSmsFromChannel'
+        log.debug "getNewSmsFromChannel with $channel"
+
+        log.trace 'reading sms list'
         def smsMap = readSMSList(channel)
         log.debug "smsMap: $smsMap"
 
         def res = []
         Map<Integer, String> exceptions = [:]
 
+        log.trace 'reading PDUs'
         smsMap.each {
             try {
                 def rawPdu = readRawSmsPdu(channel, it.key)
                 try {
                     res.add(Sms.valueOf(rawPdu))
 
-                    //todo delete successfully processed ones
+                    deleteSms(channel, it.key)
                 } catch (SmsException ignored) {
                     exceptions.put(it.key, rawPdu)
                 }
@@ -92,9 +115,10 @@ class SmsService {
             }
         }
 
+        log.debug "res: $res"
         log.debug "exceptions: $exceptions"
 
-        Map<Integer, Map<Integer, String>> exGroups = exceptions.groupBy {it -> new PduParser().parsePdu(it.value).mpRefNo}
+        Map<Integer, Map<Integer, String>> exGroups = exceptions.groupBy { it -> new PduParser().parsePdu(it.value).mpRefNo}
         log.debug "exGroups: $exGroups"
 
         def mapEx = [:]
@@ -108,7 +132,8 @@ class SmsService {
         }
 
         log.debug "mapEx: $mapEx"
-        log.trace '<< getNewSms'
+        log.debug "res: $res"
+        log.trace '<< getNewSmsFromChannel'
 
         res
     }
@@ -116,13 +141,7 @@ class SmsService {
     public void deleteSms(int channel, int idx) {
         log.trace '>> deleteSms'
 
-        if (channel < 0 || channel > 1)
-            throw new TelnetServiceException(invChannel)
-
-        try {
-            telnetService.write 'at!g=a6'
-            log.debug telnetService.readUntil(OK)
-
+        if (channel in cfg.channels) {
             telnetService.write "AT^SD=$channel,$idx"
 
             log.debug telnetService.readUntil(NL)
@@ -130,33 +149,27 @@ class SmsService {
 
             if (read.contains('*smserr'))
                 throw new TelnetServiceException(delFailed)
-        } finally {
-            telnetService.write 'at!g=55'
-            log.debug telnetService.readUntil(OK)
-        }
 
-        log.debug read
+            log.debug read
+            log.info 'SMS deleted'
+
+        } else
+            throw new TelnetServiceException(invChannel)
 
         log.trace '<< deleteSms'
     }
 
-    public Map<Integer, Integer> readSMSList(int channel) {
+    private Map<Integer, Integer> readSMSList(int channel) {
         log.trace '>> readSMSList'
 
-        telnetService.write 'at!g=a6'
-        log.debug telnetService.readUntil(OK)
+        String strRawList
 
-        String strRawList = ''
-        try {
-            telnetService.write "AT^SX=${channel}"
-            log.debug telnetService.readUntil(NL)
+        def cmd = "AT^SX=${channel}"
+        telnetService.write cmd
+        telnetService.readUntil cmd + NL
 
-            strRawList = telnetService.readUntil("*smsinc: $channel,0,0,255$NL")
-            log.debug "raw list of SMS on channel ${channel}: ${strRawList}"
-        } finally {
-            telnetService.write 'at!g=55'
-            log.debug telnetService.readUntil(OK)
-        }
+        strRawList = telnetService.readUntil("*smsinc: $channel,0,0,255$NL")
+        log.debug "raw list of SMS on channel ${channel}: ${strRawList}"
 
         def res = strRawList.split(NL).collectEntries {
             Integer[] parts = it.substring(it.indexOf(' ') + 1).split(',').collect {Integer.valueOf(it)}
@@ -171,26 +184,19 @@ class SmsService {
         res
     }
 
-    public String readRawSmsPdu(int channel, int idx) {
+    private String readRawSmsPdu(int channel, int idx) {
         log.trace '>> readRawSmsPdu'
 
         if (channel < 0 || channel > 1)
             throw new TelnetServiceException(invChannel)
 
-        String smspdu = ''
-        try {
-            telnetService.write 'at!g=a6'
-            log.debug telnetService.readUntil(OK)
+        String smspdu
+        def cmd = "AT^SR=$channel.$idx"
+        telnetService.write cmd
+        log.debug telnetService.readUntil(cmd + NL)
 
-            telnetService.write "AT^SR=$channel.$idx"
-            log.debug telnetService.readUntil(NL)
-
-            smspdu = telnetService.readUntil(NL)
-            log.debug "smspdu: $smspdu"
-        } finally {
-            telnetService.write 'at!g=55'
-            log.debug telnetService.readUntil(OK)
-        }
+        smspdu = telnetService.readUntil(NL)
+        log.debug "smspdu: $smspdu"
 
         if (smspdu.contains('*smserr'))
             throw new TelnetServiceException(readFailed)

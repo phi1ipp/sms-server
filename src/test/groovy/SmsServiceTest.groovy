@@ -44,22 +44,20 @@ class SmsServiceTest {
     }
 
     @Test
-    void testNewSms() {
-        println service.newSms(0)
+    void testReadSmsList() {
+        service.telnetService.privMode(true)
+        println service.readSMSList(0)
+        println service.readSMSList(1)
     }
 
     @Test
-    void testReadSmsList() {
-        println service.readSMSList(0)
-    }
-    @Test
     void testGetNewSms() {
-        println service.getNewSms(0)
+        println service.getNewSms()
     }
 
     @Test
     void testSendSms() {
-        service.sendSms('+79175685589', 'Проверка связи')
+        service.sendSms('+79175685589', 'Проверка связи, спи спокойно!')
     }
 
     @Test

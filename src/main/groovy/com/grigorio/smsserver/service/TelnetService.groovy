@@ -17,41 +17,123 @@ class TelnetService {
 
     TelnetClient tc = new TelnetClient()
     InputStream is
-    PrintStream os
+    OutputStream os
 
-    static final String OK = 'OK'+NL, NL = '\r\n'
+    boolean connected = false
+    boolean priveleged = false
+
+    static final String OK = 'OK' + NL, NL = '\r\n'
 
     public void connect() {
-        log.trace '>> init'
+        log.trace '>> connect'
 
         if (cfg == null) {
             throw new TelnetServiceException(TelnetServiceException.Reason.noConfig)
         }
 
-        String strLogin = 'login: '
-        String strPwd = 'Password: '
-        tc.connect(cfg.host, cfg.port)
+        if (!connected) {
+            String strLogin = 'login: '
+            String strPwd = 'Password: '
 
-        is = tc.getInputStream()
-        os = new PrintStream(tc.getOutputStream())
+            log.trace 'connecting'
+            tc.connect(cfg.host, cfg.port)
 
-        log.debug readUntil(strLogin)
-        write cfg.login
+            log.trace 'getting streams'
+            is = tc.getInputStream()
+            os = new PrintStream(tc.getOutputStream())
 
-        log.debug readUntil(strPwd)
-        write cfg.password
+            log.trace 'logging in'
+            log.debug readUntil(strLogin)
+            write cfg.login
 
-        log.debug readUntil(OK)
+            log.debug readUntil(strPwd)
+            write cfg.password
 
-        log.trace '<< init'
+            log.debug readUntil(OK)
+        } else
+            log.trace 'already connected'
+
+        connected = true
+        priveleged = false
+
+        log.trace '<< connect'
     }
 
     public void disconnect() {
         log.trace '>> disconnect'
 
-        tc.disconnect()
+        if (!connected)
+            log.info 'not connected'
+        else
+            tc.disconnect()
+
+        connected = false
+        priveleged = false
 
         log.trace '<< disconnect'
+    }
+
+    public void privMode(boolean to) {
+        log.trace '>> privMode'
+        log.debug "privMode with $to"
+
+        if (!connected) {
+            log.error 'not connected'
+            throw new TelnetServiceException('Not connected')
+        }
+
+        if (to && priveleged) {
+            log.debug 'already in priv mode'
+        } else if (to && !priveleged) {
+            write 'at!g=a6'
+            readUntil OK
+
+            priveleged = true
+            log.debug 'in priv mode`'
+        } else if (!to && !priveleged) {
+            log.debug 'already in non-priv mode'
+        } else {
+            write 'at!g=55'
+            readUntil OK
+
+            priveleged = false
+
+            log.debug 'in non-priv mode'
+        }
+        log.trace '<< privMode'
+    }
+
+    public String readUntil(String pattern, int maxRead) {
+        log.trace '>> readUntil'
+        log.debug "readUntil with $pattern and $maxRead"
+        try {
+            char lastChar = pattern.charAt(pattern.length() - 1)
+
+            StringBuffer sb = new StringBuffer()
+
+            char ch = (char) is.read()
+
+            while(sb.length() < maxRead) {
+                sb.append ch
+
+//                log.debug sb.toString()
+
+                if (ch == lastChar)
+                    if (sb.toString().endsWith(pattern)) {
+                        log.trace '<< readUntil'
+                        return sb.toString()
+                    }
+
+                ch = (char) is.read()
+            }
+
+            log.trace '<< readUntil'
+            sb.toString()
+
+        } catch (Exception e) {
+            log.error(e.message, e.cause)
+            throw e
+        }
     }
 
     public String readUntil( String pattern ) {
@@ -66,6 +148,7 @@ class TelnetService {
 
             while(true) {
                 sb.append ch
+
                 if (ch == lastChar)
                     if (sb.toString().endsWith(pattern)) {
                         log.trace '<< readUntil'
@@ -74,13 +157,10 @@ class TelnetService {
 
                 ch = (char) is.read()
             }
-        }
-        catch(Exception e) {
+        } catch (Exception e) {
             log.error(e.message, e.cause)
+            throw e
         }
-
-        log.trace '<< readUntil'
-        return null
     }
 
     public void write(String value) {
@@ -92,6 +172,7 @@ class TelnetService {
         }
         catch( Exception e ) {
             log.error e.message, e.cause
+            throw e
         }
 
         log.trace '<< write'

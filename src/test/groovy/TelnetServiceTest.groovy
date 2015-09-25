@@ -39,6 +39,28 @@ class TelnetServiceTest {
     }
 
     @Test
+    void testPrivMode() {
+        service.privMode(true)
+    }
+
+    @Test
+    void testPrivModeTwice() {
+        service.privMode(true)
+        service.privMode(true)
+    }
+
+    @Test
+    void testNonPrivMode() {
+        service.privMode(true)
+        service.privMode(false)
+    }
+
+    @Test
+    void testNonPrivModeTwice() {
+        service.privMode(false)
+    }
+
+    @Test
     void testModStatus() {
         service.write 'AT!G=A6'
         println service.readUntil('OK')
@@ -105,4 +127,12 @@ class TelnetServiceTest {
         println service.readUntil('\r\n')
         println service.readUntil('\r\n')
     }
+
+    @Test
+    void testSendCommandReadSMS() {
+        println service.sendCommand('AT!G=A6')
+
+        println service.sendCommand('AT^SR=0.11')
+    }
+
 }
