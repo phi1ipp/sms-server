@@ -127,12 +127,4 @@ class TelnetServiceTest {
         println service.readUntil('\r\n')
         println service.readUntil('\r\n')
     }
-
-    @Test
-    void testSendCommandReadSMS() {
-        println service.sendCommand('AT!G=A6')
-
-        println service.sendCommand('AT^SR=0.11')
-    }
-
 }

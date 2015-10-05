@@ -30,6 +30,8 @@ class SmsRequestController {
 
         log.trace 'sending sms'
         service.sendSms(addr, txt)
+
+        log.trace 'saving into db'
         smsRepo.save(new Sms(addr, txt))
 
         log.trace '<< sendSms'

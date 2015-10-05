@@ -1,11 +1,16 @@
 import com.grigorio.smsserver.domain.Sms
+import com.grigorio.smsserver.domain.StatusReportSms
 import com.grigorio.smsserver.exception.SmsException
 import org.ajwcc.pduUtils.gsm3040.Pdu
 import org.ajwcc.pduUtils.gsm3040.PduParser
+import org.ajwcc.pduUtils.gsm3040.SmsDeliveryPdu
 import org.ajwcc.pduUtils.gsm3040.SmsStatusReportPdu
 import org.junit.Test
 import org.smslib.Message
 import org.smslib.OutboundMessage
+
+import java.util.regex.Matcher
+import java.util.regex.Pattern
 
 class SmsTest {
     def simpleSms = '07919761989901F0040B919771655885F900085190404191522118041F0440043E04410442043E002004420435044104420020'
@@ -163,5 +168,11 @@ class SmsTest {
     void testRefNo() {
         println 'Outgoing: ' + new PduParser().parsePdu('07919762929090F031000B919771655885F90008FF52041D04430020043A043E0433043404300020043604350020043E043D002004370430044004300431043E0442043004350442002C0020044D0442043E0020044104420430044204430441003F0021000D000A')
         println 'Incoming: ' + new PduParser().parsePdu('07919762020033F106BF0B919771655885F9519052702454215190527024742100FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF')
+    }
+
+    @Test
+    void testCorrectAddress() {
+        println new Sms('79168492412', 'test')
+        println new StatusReportSms('79168492412', 'u' as char)
     }
 }

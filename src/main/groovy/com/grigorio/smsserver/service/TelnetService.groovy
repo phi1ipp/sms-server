@@ -23,6 +23,7 @@ class TelnetService {
     boolean priveleged = false
 
     static final String OK = 'OK' + NL, NL = '\r\n'
+    static final int lineLength = 80
 
     public void connect() {
         log.trace '>> connect'
@@ -43,13 +44,30 @@ class TelnetService {
             os = new PrintStream(tc.getOutputStream())
 
             log.trace 'logging in'
-            log.debug readUntil(strLogin)
+            def read = readUntil(strLogin, 2*lineLength)
+            log.debug "got: $read"
+            if (!read.contains(strLogin)) {
+                log.error "couldn't read $strLogin from modem"
+                throw new TelnetServiceException(TelnetServiceException.Reason.readFailed)
+            }
+
             write cfg.login
 
-            log.debug readUntil(strPwd)
+            read = readUntil(strPwd, lineLength)
+            log.debug "got $read"
+            if (!read.contains(strPwd)) {
+                log.error "couldn't read $strPwd from modem"
+                throw new TelnetServiceException(TelnetServiceException.Reason.readFailed)
+            }
+
             write cfg.password
 
-            log.debug readUntil(OK)
+            read = readUntil(OK, lineLength)
+            log.debug "got $read"
+            if (!read.contains(OK)) {
+                log.error "couldn't read $OK from modem"
+                throw new TelnetServiceException(TelnetServiceException.Reason.readFailed)
+            }
         } else
             log.trace 'already connected'
 
@@ -62,13 +80,17 @@ class TelnetService {
     public void disconnect() {
         log.trace '>> disconnect'
 
-        if (!connected)
-            log.info 'not connected'
-        else
-            tc.disconnect()
-
-        connected = false
-        priveleged = false
+        try {
+            if (!connected)
+                log.info 'not connected'
+            else
+                tc.disconnect()
+        } catch (Exception e) {
+            log.error "Exception trying to disconnect: $e.message"
+        } finally {
+            connected = false
+            priveleged = false
+        }
 
         log.trace '<< disconnect'
     }
@@ -86,7 +108,14 @@ class TelnetService {
             log.debug 'already in priv mode'
         } else if (to && !priveleged) {
             write 'at!g=a6'
-            readUntil OK
+
+            def read = readUntil(OK, lineLength)
+            log.debug "got: $read"
+
+            if (!read.contains(OK)) {
+                log.error "couldn't read $OK from modem"
+                throw new TelnetServiceException(TelnetServiceException.Reason.readFailed)
+            }
 
             priveleged = true
             log.debug 'in priv mode`'
@@ -94,7 +123,14 @@ class TelnetService {
             log.debug 'already in non-priv mode'
         } else {
             write 'at!g=55'
-            readUntil OK
+
+            def read = readUntil(OK, lineLength)
+            log.debug "got: $read"
+
+            if (!read.contains(OK)) {
+                log.error "couldn't read $OK from modem"
+                throw new TelnetServiceException(TelnetServiceException.Reason.readFailed)
+            }
 
             priveleged = false
 
@@ -105,7 +141,7 @@ class TelnetService {
 
     public String readUntil(String pattern, int maxRead) {
         log.trace '>> readUntil'
-        log.debug "readUntil with $pattern and $maxRead"
+        log.debug "readUntil with ${pattern == NL ? 'NL' : pattern} and $maxRead"
         try {
             char lastChar = pattern.charAt(pattern.length() - 1)
 
@@ -113,10 +149,13 @@ class TelnetService {
 
             char ch = (char) is.read()
 
+            if (ch == (0xFFFF as Character)) {
+                log.error "an attempt to read beyond end of stream"
+                throw new TelnetServiceException(TelnetServiceException.Reason.eosReached)
+            }
+
             while(sb.length() < maxRead) {
                 sb.append ch
-
-//                log.debug sb.toString()
 
                 if (ch == lastChar)
                     if (sb.toString().endsWith(pattern)) {
@@ -125,6 +164,11 @@ class TelnetService {
                     }
 
                 ch = (char) is.read()
+
+                if (ch == (0xFFFF as Character)) {
+                    log.error "an attempt to read beyond end of stream"
+                    throw new TelnetServiceException(TelnetServiceException.Reason.eosReached)
+                }
             }
 
             log.trace '<< readUntil'

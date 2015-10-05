@@ -7,6 +7,7 @@ public class TelnetServiceException extends Exception {
         static def readFailed = 'Can\'t read SMS'
         static def sendFailed = 'Can\'t send SMS'
         static def noConfig = 'No configuration found'
+        static def eosReached = 'End of stream reached'
     }
 
     public TelnetServiceException(String msg) {

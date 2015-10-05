@@ -16,6 +16,8 @@ import javax.persistence.GenerationType
 import javax.persistence.Id
 import javax.persistence.Transient
 import java.time.LocalDateTime
+import java.util.regex.Matcher
+import java.util.regex.Pattern
 
 import static com.grigorio.smsserver.exception.SmsException.Reason.*
 
@@ -37,16 +39,14 @@ class Sms {
     @Transient int iValidHours
 
     public Sms(String address, String txt) {
+
         this.address = address
         this.txt = txt
 
         ts = LocalDateTime.now()
         refNo = (new Random().nextInt() & 0xff) as byte
-    }
 
-    public Sms valid(int iHours) {
-        this.iValidHours = iHours
-        this
+        checkAndCorrectAddress()
     }
 
     protected Sms() {}
@@ -56,14 +56,16 @@ class Sms {
             throw new SmsException(argNull)
         }
 
+        // if it's not a status report and it's a part of a multipart message
         Pdu pdu = new PduParser().parsePdu(rawPdu)
-        if (!pdu instanceof SmsStatusReportPdu && !pdu instanceof SmsDeliveryPdu && pdu.concatInfo != null) {
+        if (!(pdu instanceof SmsStatusReportPdu) && pdu.concatInfo != null) {
             throw new SmsException(argMultiPart)
         }
 
         if (pdu instanceof SmsDeliveryPdu) {
             def sms = new Sms(pdu.address, pdu.decodedText)
             sms.status = 'i'
+            sms.checkAndCorrectAddress()
             sms
 
         } else if (pdu instanceof SmsStatusReportPdu) {
@@ -75,7 +77,7 @@ class Sms {
                 case 0 : status = 'd';
             }
             def sms = new StatusReportSms(reportPdu.address, status)
-            log.debug "messageReference: ${pdu.messageReference} refNo: ${pdu.mpRefNo}"
+
             sms.refNo = (reportPdu.messageReference & 0xff) as byte
             sms
 
@@ -180,4 +182,28 @@ class Sms {
         bt.each { cs += it }
         return cs
     }
+
+    protected String checkAndCorrectAddress() {
+        Pattern ptn = Pattern.compile('^\\+\\d{11}$')
+        Matcher matcher = ptn.matcher(address)
+
+        // if addresses not in a required format, try to guess and fix
+        if (!matcher.matches()) {
+            if (address.toCharArray().each {it.isDigit()} && address.length() == 11)
+                address = '+' + address
+        } else {
+            return address
+        }
+    }
+
+    Sms setStatus(char status) {
+        this.status = status
+        return this
+    }
+
+    public Sms valid(int iHours) {
+        this.iValidHours = iHours
+        this
+    }
+
 }

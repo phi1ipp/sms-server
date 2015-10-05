@@ -197,8 +197,12 @@ class MailerService {
     }
 
     void sendMail(String to, String text) {
+        sendMail(to, 'New SMS', text)
+    }
+
+    void sendMail(String to, String subj, String text) {
         log.trace '>> sendMail'
-        log.debug "sendMail with $to"
+        log.debug "sendMail with $to - $subj"
 
         try {
             MimeMessage msg = new MimeMessage(session)
@@ -206,9 +210,9 @@ class MailerService {
             msg.setFrom(new InternetAddress('sms@max-avia.ru'))
             msg.setRecipient(Message.RecipientType.TO, new InternetAddress(to))
 
-            msg.setSubject('New SMS')
+            msg.setSubject(subj)
 
-            msg.setText(text)
+            msg.setContent(text, 'text/html; charset=utf-8')
 
             Transport.send(msg)
 
@@ -219,5 +223,33 @@ class MailerService {
         }
 
         log.trace '<< sendMail'
+    }
+
+    void sendHistory(String to, List<Sms> history) {
+        log.trace '>> sendHistory'
+        StringBuilder sb = new StringBuilder('<html><body>')
+
+        log.trace 'searching history for an agent last talking'
+        Sms smsForAgent = history.find {!it.incoming}
+
+        String agent = ''
+        if (smsForAgent != null && smsForAgent.txt.contains('//'))
+            agent = smsForAgent.txt.substring(smsForAgent.txt.lastIndexOf('//') + 2)
+
+        log.trace 'performing history formatting'
+        history.each {
+            if (it.incoming) {
+                sb.append('<hr><font color="blue"><b>Получено</b> ').append(it.ts).append('<br>').append(it.txt)
+            } else {
+                sb.append('<hr><font color="red"><b>Отправлено</b> ').append(it.ts).append('<br>').append(it.txt)
+            }
+        }
+
+        sb.append('</body></hmtl>')
+
+        log.trace 'sending email with the history'
+        sendMail(to, "История переписки с ${history.get(0).address} - $agent", sb.toString())
+
+        log.trace '<< sendHistory'
     }
 }
