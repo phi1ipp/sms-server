@@ -70,9 +70,11 @@ class SmsService {
         sendSms(new Sms(addr, txt))
     }
 
-    void sendPdu(String pdu, int channel) {
+    int sendPdu(String pdu, int channel) {
         log.trace '>> sendPdu'
         log.debug "sendPdu with $pdu on channel $channel"
+
+        int refNo = -1
 
         if (!(channel in cfg.channels)) {
             log.error "$channel not if configured channels"
@@ -85,14 +87,26 @@ class SmsService {
         try {
             String cmd = "AT^SM=$channel,$pdu"
             telnetService.write cmd
-            log.debug telnetService.readUntil(cmd + NL, 2 * cmd.size())
 
-            def res = telnetService.readUntil(NL, TelnetService.lineLength)
-            log.debug res
+            // read until *smserr, *smsout or exception
+            String res
+            boolean bRun = true
+            while (bRun) {
+                res = telnetService.readUntil(NL, TelnetService.lineLength)
+                log.debug res
 
-            if (res.contains('*smserr')) {
-                log.warn "modem failed to send pdu, adding to retry list"
-                resendQueue.add(Collections.singletonMap(pdu, channel))
+                if (res.contains('*smserr')) {
+                    log.warn "modem failed to send pdu, adding to retry list"
+                    resendQueue.add(Collections.singletonMap(pdu, channel))
+                    bRun = false
+
+                } else if (res.contains('*smsout')) {
+                    String strRefNo = res.split(':')[1].split(',')[1]
+                    refNo = Integer.valueOf(strRefNo)
+
+                    log.info "pdu has been sent with ref #$refNo"
+                    bRun = false
+                }
             }
         } catch (Exception e) {
             log.error "Exception ${e.message} sending pdu"
@@ -102,6 +116,7 @@ class SmsService {
         }
 
         log.trace '<< sendPdu'
+        return refNo
     }
 
     void resendPdu() {
@@ -260,15 +275,27 @@ class SmsService {
         def cmd = "AT^SD=$channel,$idx"
         telnetService.write cmd
 
-        log.debug telnetService.readUntil(NL, 2 * cmd.length())
+        // read until *smserr, *smsdel or exception
+        String res
+        boolean bRun = true
+        try {
+            while (bRun) {
+                res = telnetService.readUntil(NL, TelnetService.lineLength)
+                log.debug res
 
-        def read = telnetService.readUntil(NL, TelnetService.lineLength)
-        log.debug read
+                if (res.contains('*smserr')) {
+                    log.error "modem failed to delete sms"
+                    bRun = false
 
-        if (read.contains('*smserr'))
-            throw new TelnetServiceException(delFailed)
-
-        log.info 'SMS deleted'
+                } else if (res.contains('*smsdel')) {
+                    log.info 'SMS deleted'
+                    bRun = false
+                }
+            }
+        } catch (TelnetServiceException e) {
+            log.error "exception deleting sms from modem: $e.message"
+            throw new SmsServiceException(delFailed)
+        }
 
         log.trace '<< deleteSms'
     }
@@ -283,45 +310,49 @@ class SmsService {
             throw new TelnetServiceException(invChannel)
         }
 
-        def cmd = "AT^SX=${channel}"
+        def cmd = "AT^SX=$channel"
         telnetService.write cmd
 
-        def read = telnetService.readUntil(cmd + NL, 2 * cmd.length())
-        log.debug "got: $read"
-        if (!read.contains(cmd)) {
-            log.error "couldn't read from modem"
-            throw new TelnetServiceException(readFailed)
+        // read until *smserr, *smsinc....255 or exception
+        String res
+        StringBuilder sbSmsinc = new StringBuilder()
+        boolean bRun = true
+        try {
+            while (bRun) {
+                res = telnetService.readUntil(NL, TelnetService.lineLength)
+                log.debug "got: $res"
+
+                if (res.contains('*smserr')) {
+                    log.error "modem failed to read sms"
+                    bRun = false
+
+                } else if (res.contains('*smsinc')) {
+                    sbSmsinc.append(res)
+
+                    if (res.contains("*smsinc: $channel,0,0,255"))
+                        bRun = false
+                }
+            }
+
+        } catch (TelnetServiceException e) {
+            log.error "exception reading sms list from modem: $e.message"
+            throw e
         }
 
-        StringBuilder rawList = new StringBuilder()
+        strRawList = sbSmsinc.toString()
+        log.debug "raw list of SMS on channel $channel: $strRawList"
 
-        log.trace "reading list of SMS from modem"
-        boolean done = false
-        while (!done) {
-            def line = telnetService.readUntil(NL, 80)
-            log.debug "got: $line"
-
-            if (line.contains("*smsinc: $channel,0,0,255"))
-                done = true
-
-            if (line.contains('*smsinc'))
-                rawList.append(line)
-        }
-
-        strRawList = rawList.toString()
-        log.debug "raw list of SMS on channel ${channel}: ${strRawList}"
-
-        def res = strRawList.split(NL).collectEntries {
+        def map = strRawList.split(NL).collectEntries {
             Integer[] parts = it.substring(it.indexOf(' ') + 1).split(',').collect {Integer.valueOf(it)}
             def m = [:]
             m.put parts[1], parts[2]
             m
         }
 
-        res.remove(0)
+        map.remove(0)
 
         log.trace '<< readSMSList'
-        res
+        map
     }
 
     private String readRawSmsPdu(int channel, int idx) {
@@ -335,21 +366,38 @@ class SmsService {
         def cmd = "AT^SR=$channel.$idx"
         telnetService.write cmd
 
-        def read = telnetService.readUntil(cmd + NL, 2 * cmd.length())
-        log.debug "got: $read"
-        if (!read.contains(cmd)) {
-            log.error "couldn't read from modem"
-            throw new TelnetServiceException(readFailed)
+        // read until *smserr, *smspdu or exception
+        String res
+        StringBuilder sbPdu = new StringBuilder()
+        boolean bRun = true
+        boolean bPdu = false
+        try {
+            while (bRun) {
+                res = telnetService.readUntil(NL, TelnetService.lineLength)
+                log.debug res
+
+                if (res.contains('*smserr')) {
+                    log.error "modem failed to read sms"
+                    bRun = false
+
+                } else if (res.contains('*smspdu')) {
+                    bPdu = true
+                }
+
+                if (bPdu) {
+                    sbPdu.append(res)
+
+                    if (res.endsWith(NL))
+                        bRun = false
+                }
+            }
+
+        } catch (TelnetServiceException e) {
+            log.error "exception deleting sms from modem: $e.message"
+            throw new SmsServiceException(delFailed)
         }
 
-        String smspdu = telnetService.readUntil(NL, 10 * TelnetService.lineLength)
-        log.debug "smspdu: $smspdu"
-
-        if (!smspdu.contains('*smspdu')) {
-            log.error "couldn't read from modem"
-            throw new TelnetServiceException(readFailed)
-        }
-
+        String smspdu = sbPdu.toString()
         String[] parts = smspdu.substring(smspdu.indexOf(' ') + 1).split(',')
 
         log.trace '<< readRawSmsPdu'

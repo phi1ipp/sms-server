@@ -147,28 +147,26 @@ class TelnetService {
 
             StringBuffer sb = new StringBuffer()
 
-            char ch = (char) is.read()
+            boolean bRun = true
 
-            if (ch == (0xFFFF as Character)) {
-                log.error "an attempt to read beyond end of stream"
-                throw new TelnetServiceException(TelnetServiceException.Reason.eosReached)
-            }
+            while(bRun) {
 
-            while(sb.length() < maxRead) {
-                sb.append ch
-
-                if (ch == lastChar)
-                    if (sb.toString().endsWith(pattern)) {
-                        log.trace '<< readUntil'
-                        return sb.toString()
-                    }
-
-                ch = (char) is.read()
+                char ch = (char) is.read()
 
                 if (ch == (0xFFFF as Character)) {
                     log.error "an attempt to read beyond end of stream"
                     throw new TelnetServiceException(TelnetServiceException.Reason.eosReached)
                 }
+
+                sb.append ch
+
+                if (ch == lastChar)
+                    if (sb.toString().endsWith(pattern)) {
+                        bRun = false
+                    }
+
+                if (sb.length() == maxRead)
+                    bRun = false
             }
 
             log.trace '<< readUntil'

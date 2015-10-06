@@ -248,7 +248,7 @@ class MailerService {
         sb.append('</body></hmtl>')
 
         log.trace 'sending email with the history'
-        sendMail(to, "История переписки с ${history.get(0).address} - $agent", sb.toString())
+        sendMail(to, "SMS переписка с абонентом ${history.get(0).address} - $agent", sb.toString())
 
         log.trace '<< sendHistory'
     }

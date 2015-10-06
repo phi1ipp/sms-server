@@ -127,4 +127,9 @@ class TelnetServiceTest {
         println service.readUntil('\r\n')
         println service.readUntil('\r\n')
     }
+
+    @Test
+    void a() {
+        println (0xFFFF as Character)
+    }
 }
