@@ -172,7 +172,7 @@ class SmsTest {
 
     @Test
     void testCorrectAddress() {
-        println new Sms('79168492412', 'test')
-        println new StatusReportSms('79168492412', 'u' as char)
+        println new Sms('79168492412', 'test').toRawPdu('+79168492412')
+        println new Sms('79168492412', 'test').toRawPdu('+79168492412')
     }
 }

@@ -1,8 +1,10 @@
 package com.grigorio.smsserver.service
 
 import com.grigorio.smsserver.config.ApplicationConfig
+import com.grigorio.smsserver.domain.Pdu
 import com.grigorio.smsserver.domain.Sms
 import com.grigorio.smsserver.domain.StatusReportSms
+import com.grigorio.smsserver.repository.PduRepository
 import com.grigorio.smsserver.repository.SmsRepository
 import groovy.util.logging.Slf4j
 import org.springframework.beans.factory.annotation.Autowired
@@ -25,6 +27,9 @@ class SchedulerService {
     SmsRepository smsRepository
 
     @Autowired
+    PduRepository pduRepository
+
+    @Autowired
     ApplicationConfig appCfg
 
     @Scheduled(fixedDelay = 30000l)
@@ -37,14 +42,21 @@ class SchedulerService {
 
         smsList.each {
             log.trace "sending SMS: $it"
-            smsService.sendSms(it)
+            Map<String, Integer> mapPdu = smsService.sendSms(it)
+            it.parts = mapPdu.size()
 
+            log.trace 'saving sms into DB'
             try {
                 smsRepository.save(it)
             } catch (SQLException e) {
                 log.error "exception saving data to db: ${e.message}"
 
                 smsRepository.save(it)
+            }
+
+            log.trace 'saving sent PDUs into db'
+            mapPdu.each {
+                pdu -> pduRepository.save(new Pdu(pdu.key, pdu.value, it.id))
             }
         }
 
@@ -86,25 +98,50 @@ class SchedulerService {
                 sms ->
                     log.debug "addr: ${sms.address} refNo: ${sms.refNo}"
 
-                    List<Sms> saved
+                    List<Pdu> savedPdus
 
                     try {
-                        saved =
-                                smsRepository.findByAddressAndTsAfterOrderByTsDesc(
-                                        sms.address, LocalDateTime.now().minusDays(appCfg.historyDepth))
+                        savedPdus = pduRepository.findByRefNo(sms.refNo)
                     } catch (SQLException e) {
                         log.error "exception pulling information from DB: ${e.message}"
 
-                        saved =
-                                smsRepository.findByAddressAndTsAfterOrderByTsDesc(
-                                        sms.address, LocalDateTime.now().minusDays(appCfg.historyDepth))
+                        savedPdus = pduRepository.findByRefNo(sms.refNo)
                     }
 
-                    log.debug "list of sms in repo: $saved"
+                    log.debug "list of PDUs with refNo: $sms.refNo in repo: $savedPdus"
 
-                    Sms smsToUpdate = saved.get(0)
-                    smsToUpdate.status = sms.status
-                    smsRepository.save(smsToUpdate)
+                    if (savedPdus.size() < 1) {
+                        log.error "can't find pdu with ref# $sms.refNo in DB"
+                    } else if (savedPdus.size() > 1) {
+                        log.error "more than one pdu in DB with ref# $sms.refNo"
+                    } else {
+                        Pdu pdu = savedPdus.get(0)
+                        pdu.status = 'd'
+
+                        log.trace 'changing status of pdu to delivered in DB'
+                        pduRepository.save(pdu)
+
+                        long smsId = pdu.smsId
+                        log.debug "smsId: $smsId"
+
+                        List<Pdu> allPduForSMS = pduRepository.findBySmsId(smsId)
+
+                        log.trace 'checking if all PDUs for the sms are delivered'
+                        if (allPduForSMS.every { it.status == 'd' as char}) {
+                            log.info 'all PDUs are now delivered'
+
+                            log.trace 'deleting PDUs from DB'
+                            allPduForSMS.each {
+                                pduRepository.delete(it)
+                            }
+
+                            Sms theSMS = smsRepository.findOne(smsId)
+
+                            log.trace 'setting SMS status to delivered in DB'
+                            theSMS.status = 'd'
+                            smsRepository.save(theSMS)
+                        }
+                    }
             }
         }
 
@@ -115,7 +152,25 @@ class SchedulerService {
     void resendFailedPdus() {
         log.trace '>> resendFailedPdus'
 
-        smsService.resendPdu()
+        Map<String, Integer> map = smsService.resendPdu()
+
+        map.each {
+            pdu ->
+                List<Pdu> savedPdu = pduRepository.findByPdu(pdu.key)
+                log.debug "list of PDUs in DB with the same pdu: $savedPdu"
+
+                if (savedPdu.size() < 1) {
+                    log.error 'pdu not found in DB'
+                } else if (savedPdu.size() > 1) {
+                    log.error 'more than one pdu found in DB'
+                } else {
+                    Pdu foundPdu = savedPdu.get(0)
+                    foundPdu.refNo = pdu.value
+
+                    log.trace 'changing PDU ref# in DB'
+                    pduRepository.save(foundPdu)
+                }
+        }
 
         log.trace '<< resendFailedPdus'
     }

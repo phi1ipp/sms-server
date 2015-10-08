@@ -1,5 +1,5 @@
 group 'com.grigorio'
-version '1.0-SNAPSHOT'
+version '1.0.2-SNAPSHOT'
 
 buildscript {
     repositories {

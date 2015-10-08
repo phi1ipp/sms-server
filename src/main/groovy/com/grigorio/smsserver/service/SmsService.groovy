@@ -29,12 +29,10 @@ class SmsService {
     SmsServiceConfig cfg
 
     Random rnd = new Random()
-
     Lock lock = new ReentrantLock()
-
     ConcurrentLinkedQueue<Map<String, Integer>> resendQueue = new ConcurrentLinkedQueue<>()
 
-    public void sendSms(Sms sms) {
+    Map<String, Integer> sendSms(Sms sms) {
         log.trace '>> sendSms'
 
         int channel = selectChannel()
@@ -42,6 +40,8 @@ class SmsService {
 
         List<String> pdus = sms.toRawPdu(cfg.smsc)
         log.debug "pdus to send: $pdus"
+
+        Map<String, Integer> mapPdu = new HashMap<>()
 
         synchronized (this) {
             log.trace 'locking access to telnet service'
@@ -52,7 +52,9 @@ class SmsService {
                 telnetService.privMode(true)
 
                 pdus.each {
-                    sendPdu(it, channel)
+                    def key = it.split(',')[1]
+                    mapPdu[key] = '-1'
+                    mapPdu[key] = sendPdu(it, channel)
                 }
                 log.trace '<< sendSms'
             } catch (Exception e) {
@@ -64,10 +66,12 @@ class SmsService {
                 lock.unlock()
             }
         }
+
+        return mapPdu
     }
 
-    void sendSms(String addr, String txt) {
-        sendSms(new Sms(addr, txt))
+    Map<String, Integer> sendSms(String addr, String txt) {
+        return sendSms(new Sms(addr, txt))
     }
 
     int sendPdu(String pdu, int channel) {
@@ -119,8 +123,10 @@ class SmsService {
         return refNo
     }
 
-    void resendPdu() {
+    Map<String, Integer> resendPdu() {
         log.trace '>> resendPdu'
+
+        Map<String, Integer> resendMap = new HashMap<>()
 
         if (resendQueue.size() > 0) {
             log.trace 'moving elements from resend queue into a local copy'
@@ -139,7 +145,7 @@ class SmsService {
                     map -> map.each {
                         String pdu, Integer channel ->
                             try {
-                                sendPdu(pdu, channel)
+                                resendMap << [pdu: sendPdu(pdu, channel)]
                             } catch(Exception e) {
                                     log.error "exception resending PDU: ${e.message}"
                                     resendQueue.add(Collections.singletonMap(pdu, channel))
@@ -157,6 +163,7 @@ class SmsService {
         }
 
         log.trace '<< resendPdu'
+        return resendMap
     }
 
     public List<Sms> getNewSms() {

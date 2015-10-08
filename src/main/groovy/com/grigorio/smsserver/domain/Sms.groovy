@@ -16,6 +16,7 @@ import javax.persistence.GenerationType
 import javax.persistence.Id
 import javax.persistence.Transient
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.util.regex.Matcher
 import java.util.regex.Pattern
 
@@ -32,9 +33,10 @@ class Sms {
     String address, txt
     LocalDateTime ts
 
-    byte refNo
+    int refNo
     char status = 'u'   //undefined
     boolean incoming = false
+    int parts = 0
 
     @Transient int iValidHours
 
@@ -78,7 +80,7 @@ class Sms {
             }
             def sms = new StatusReportSms(reportPdu.address, status)
 
-            sms.refNo = (reportPdu.messageReference & 0xff) as byte
+            sms.refNo = reportPdu.messageReference
             sms
 
         } else
@@ -138,6 +140,7 @@ class Sms {
         OutboundMessage msg = new OutboundMessage(address, txt)
         msg.setEncoding(Message.MessageEncodings.ENCUCS2)
         msg.statusReport = true
+        msg.date = Date.from(ts.atZone(ZoneId.systemDefault()).toInstant())
 
         List<String> lstRawPdus = msg.getPdus(smsc, refNo)
 
@@ -188,12 +191,11 @@ class Sms {
         Matcher matcher = ptn.matcher(address)
 
         // if addresses not in a required format, try to guess and fix
-        if (!matcher.matches()) {
+        if (!matcher.matches())
             if (address.toCharArray().each {it.isDigit()} && address.length() == 11)
                 address = '+' + address
-        } else {
-            return address
-        }
+
+        address
     }
 
     Sms setStatus(char status) {

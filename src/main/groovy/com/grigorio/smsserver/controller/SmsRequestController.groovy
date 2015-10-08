@@ -1,6 +1,8 @@
 package com.grigorio.smsserver.controller
 
+import com.grigorio.smsserver.domain.Pdu
 import com.grigorio.smsserver.domain.Sms
+import com.grigorio.smsserver.repository.PduRepository
 import com.grigorio.smsserver.repository.SmsRepository
 import com.grigorio.smsserver.service.SmsService
 import groovy.util.logging.Slf4j
@@ -18,6 +20,9 @@ class SmsRequestController {
     @Autowired
     SmsRepository smsRepo
 
+    @Autowired
+    PduRepository pduRepo
+
     @RequestMapping("/send")
     public String sendSms(
             @RequestParam(value = 'http_username') String user,
@@ -29,10 +34,18 @@ class SmsRequestController {
         log.debug "sendSms: user=$user pwd=$pwd addr=$addr txt=$txt"
 
         log.trace 'sending sms'
-        service.sendSms(addr, txt)
+        Sms sms = new Sms(addr, txt)
+        Map<String, Integer> mapPdu = service.sendSms(sms)
 
-        log.trace 'saving into db'
-        smsRepo.save(new Sms(addr, txt))
+        sms.parts = mapPdu.size()
+
+        log.trace 'saving SMS into db'
+        smsRepo.save(sms)
+
+        log.trace 'saving sent PDUs into db'
+        mapPdu.each {
+           pduRepo.save(new Pdu(it.key, it.value, sms.id))
+        }
 
         log.trace '<< sendSms'
         return "inside sendSms with user=$user pwd=$pwd addr=$addr txt=$txt"

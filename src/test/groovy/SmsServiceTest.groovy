@@ -47,7 +47,7 @@ class SmsServiceTest {
 
     @Test
     void testSendSms() {
-        service.sendSms('+79175685589', 'Проверка связи, спи спокойно!')
+        println service.sendSms('+79175685589', 'Проверка связи, спи спокойно!')
     }
 
     @Test
@@ -57,6 +57,6 @@ class SmsServiceTest {
 
     @Test
     void testSendMultiSms2() {
-        service.sendSms('+14692379239', 'Поскольку во всех предыдущих погружениях мы обнаруживали Призраков лишь по счастливой случайности,')
+        println service.sendSms('+79175685589', 'Поскольку во всех предыдущих погружениях мы обнаруживали Призраков лишь по счастливой случайности,')
     }
 }
