@@ -46,7 +46,5 @@ class SmsRequestControllerTest {
         assert smsRepo.findByAddress('+14692379239').size() > 0
 
         println smsRepo.findByAddress('+14692379239').get(0).txt
-
-        println smsRepo.findByAddressAndRefNo('+14692379239', Byte.valueOf('18')).size()
     }
 }

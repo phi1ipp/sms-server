@@ -76,7 +76,11 @@ class Sms {
             char status = 'u'
 
             switch (reportPdu.status) {
-                case 0 : status = 'd';
+                case 0 :
+                    status = 'd'
+                    break
+                default :
+                    status = 'n'
             }
             def sms = new StatusReportSms(reportPdu.address, status)
 

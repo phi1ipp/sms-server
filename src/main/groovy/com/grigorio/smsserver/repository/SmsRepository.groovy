@@ -10,6 +10,5 @@ interface SmsRepository extends CrudRepository<Sms, Long>{
     List<Sms> findByAddress(String addr)
     List<Sms> findByAddressAndTsAfterOrderByTsDesc(String addr, LocalDateTime dt)
 
-    @Query(value = 'select count(*) from sms', nativeQuery = true)
-    List<Sms> findCount()
+    List<Sms> findByTsAfterAndStatusNotOrderByTsDesc(LocalDateTime dt, char status)
 }

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+        <html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <link href="/css/style.css" th:href="@{/css/style.css}" rel="stylesheet"/>
+</head>
+<body>
+<table>
+    <thead>
+    <tr>
+        <th colspan="4">Текущий статус отправленных СМС за последние <span th:text="${depth}">2</span> дня</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="sms : ${smsList}">
+        <td th:text="${sms.ts}">TS</td>
+        <td th:text="${sms.address}">Address</td>
+        <td th:text="${sms.txt}">Text</td>
+        <td th:switch="${sms.status}">
+            <div th:case="'d'">Доставлено</div>
+            <div th:case="'u'">Не доставлено</div>
+        </td>
+    </tr>
+    </tbody>
+</table>
+</body>
+</html>
