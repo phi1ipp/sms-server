@@ -21,15 +21,18 @@ class Pdu {
     int refNo
     char status = 's'
 
+    int channel
+
     @Transient
     String addr
 
-    Pdu(String aPdu, int aRefNo, long smsId) {
-        this.pdu = aPdu
+    Pdu(String aFullPdu, int aRefNo, long smsId, int channel) {
+        this.pdu = aFullPdu
         this.refNo = aRefNo
         this.smsId = smsId
+        this.channel = channel
 
-        addr = new PduParser().parsePdu(this.pdu).address
+        addr = new PduParser().parsePdu(aFullPdu.split(',')[1]).address
 
         if (aRefNo < 0)
             status = 'u'
@@ -37,7 +40,7 @@ class Pdu {
 
     @Override
     String toString() {
-        return "[PDU - status=$status refNo=$refNo smsId=$smsId pdu=$pdu]"
+        return "[PDU - status=$status refNo=$refNo smsId=$smsId pdu=$pdu channel=$channel]"
     }
 
     // default constructor

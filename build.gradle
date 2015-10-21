@@ -1,5 +1,5 @@
 group 'com.grigorio'
-version '1.0.3-SNAPSHOT'
+version '1.0.5-SNAPSHOT'
 
 buildscript {
     repositories {
@@ -7,7 +7,7 @@ buildscript {
     }
 
     dependencies {
-        classpath("org.springframework.boot:spring-boot-gradle-plugin:1.2.5.RELEASE")
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:1.2.7.RELEASE")
     }
 }
 apply plugin: 'groovy'
@@ -33,13 +33,13 @@ dependencies {
     compile 'org.springframework.boot:spring-boot-starter-thymeleaf'
     compile 'commons-net:commons-net:3.3'
     compile 'commons-codec:commons-codec:1.10'
-    compile 'ch.qos.logback:logback-classic:1.1.3'
-    compile 'mysql:mysql-connector-java:5.1.36'
+    compile 'ch.qos.logback:logback-classic'
+    compile 'mysql:mysql-connector-java'
 
-    testCompile 'org.springframework:spring-test:4.2.1.RELEASE'
+    testCompile 'org.springframework:spring-test'
 
     compile 'org.codehaus.groovy:groovy-all:2.3.11'
     compile files('libs/smslib-3.5.4.jar')
 
-    testCompile("junit:junit")
+    testCompile "junit:junit"
 }

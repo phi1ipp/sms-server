@@ -18,6 +18,9 @@ import java.time.LocalDateTime
 @Service
 class SchedulerService {
     @Autowired
+    IntegrationService integrationService
+
+    @Autowired
     MailerService mailerService
 
     @Autowired
@@ -42,22 +45,7 @@ class SchedulerService {
 
         smsList.each {
             log.trace "sending SMS: $it"
-            Map<String, Integer> mapPdu = smsService.sendSms(it)
-            it.parts = mapPdu.size()
-
-            log.trace 'saving sms into DB'
-            try {
-                smsRepository.save(it)
-            } catch (SQLException e) {
-                log.error "exception saving data to db: ${e.message}"
-
-                smsRepository.save(it)
-            }
-
-            log.trace 'saving sent PDUs into db'
-            mapPdu.each {
-                pdu -> pduRepository.save(new Pdu(pdu.key, pdu.value, it.id))
-            }
+            integrationService.sendSms(it)
         }
 
         log.trace 'checking new sms'
@@ -152,24 +140,30 @@ class SchedulerService {
     void resendFailedPdus() {
         log.trace '>> resendFailedPdus'
 
-        Map<String, Integer> map = smsService.resendPdu()
+        List<Pdu> lstPdu = smsService.resendPdu()
 
-        map.each {
-            pdu ->
-                List<Pdu> savedPdu = pduRepository.findByPdu(pdu.key)
-                log.debug "list of PDUs in DB with the same pdu: $savedPdu"
+        lstPdu.findAll { it.refNo > 0 }
+                .each {
+                    pdu ->
+                        List<Pdu> savedPdu = pduRepository.findByPdu(pdu.pdu)
+                        log.debug "list of PDUs in DB with the same pdu: $savedPdu"
 
-                if (savedPdu.size() < 1) {
-                    log.error 'pdu not found in DB'
-                } else if (savedPdu.size() > 1) {
-                    log.error 'more than one pdu found in DB'
-                } else {
-                    Pdu foundPdu = savedPdu.get(0)
-                    foundPdu.refNo = pdu.value
+                        if (savedPdu.size() < 1) {
+                            log.error 'pdu not found in DB'
+                        } else if (savedPdu.size() > 1) {
+                            log.error 'more than one pdu found in DB'
+                        } else {
+                            Pdu foundPdu = savedPdu.get(0)
+                            foundPdu.refNo = pdu.refNo
 
-                    log.trace 'changing PDU ref# in DB'
-                    pduRepository.save(foundPdu)
-                }
+                            log.trace 'changing PDU ref# in DB'
+                            pduRepository.save(foundPdu)
+                        }
+        }
+
+        // add into the resend queue all failed PDUs
+        synchronized (smsService) {
+            smsService.resendQueue.addAll(lstPdu.findAll { it.refNo < 0 })
         }
 
         log.trace '<< resendFailedPdus'

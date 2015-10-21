@@ -1,10 +1,7 @@
 package com.grigorio.smsserver.controller
 
-import com.grigorio.smsserver.domain.Pdu
 import com.grigorio.smsserver.domain.Sms
-import com.grigorio.smsserver.repository.PduRepository
-import com.grigorio.smsserver.repository.SmsRepository
-import com.grigorio.smsserver.service.SmsService
+import com.grigorio.smsserver.service.IntegrationService
 import groovy.util.logging.Slf4j
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.web.bind.annotation.RequestMapping
@@ -15,13 +12,7 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 class SmsRequestController {
     @Autowired
-    SmsService service
-
-    @Autowired
-    SmsRepository smsRepo
-
-    @Autowired
-    PduRepository pduRepo
+    IntegrationService service
 
     @RequestMapping("/send")
     public String sendSms(
@@ -33,21 +24,15 @@ class SmsRequestController {
 
         log.debug "sendSms: user=$user pwd=$pwd addr=$addr txt=$txt"
 
-        log.trace 'sending sms'
-        Sms sms = new Sms(addr, txt)
-        Map<String, Integer> mapPdu = service.sendSms(sms)
-
-        sms.parts = mapPdu.size()
-
-        log.trace 'saving SMS into db'
-        smsRepo.save(sms)
-
-        log.trace 'saving sent PDUs into db'
-        mapPdu.each {
-           pduRepo.save(new Pdu(it.key, it.value, sms.id))
-        }
+        log.trace 'sending sms in a separate thread'
+        new Thread(new Runnable() {
+            @Override
+            void run() {
+                service.sendSms(new Sms(addr.trim(), txt.trim()))
+            }
+        }).start()
 
         log.trace '<< sendSms'
-        return "inside sendSms with user=$user pwd=$pwd addr=$addr txt=$txt"
+        return "Message sent"
     }
 }

@@ -1,6 +1,7 @@
 package com.grigorio.smsserver.service
 
 import com.grigorio.smsserver.config.SmsServiceConfig
+import com.grigorio.smsserver.domain.Pdu
 import com.grigorio.smsserver.exception.SmsServiceException
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.stereotype.Service
@@ -30,18 +31,21 @@ class SmsService {
 
     Random rnd = new Random()
     Lock lock = new ReentrantLock()
-    ConcurrentLinkedQueue<Map<String, Integer>> resendQueue = new ConcurrentLinkedQueue<>()
+    ConcurrentLinkedQueue<Pdu> resendQueue = new ConcurrentLinkedQueue<>()
 
-    Map<String, Integer> sendSms(Sms sms) {
+    /**
+     * Sends SMS
+     * @param sms SMS to send
+     * @return list of PDUs with status and channel
+     */
+    List<Pdu> sendSms(Sms sms) {
         log.trace '>> sendSms'
 
         int channel = selectChannel()
-        log.debug "channel to send: ${channel}"
+        log.debug "channel to send: $channel"
 
-        List<String> pdus = sms.toRawPdu(cfg.smsc)
-        log.debug "pdus to send: $pdus"
-
-        Map<String, Integer> mapPdu = new HashMap<>()
+        log.trace 'preparing a list of pdu with refNo=-1'
+        List<Pdu> lstPdu = sms.toRawPdu(cfg.smsc).collect { new Pdu(it, -1, 0, channel) }
 
         synchronized (this) {
             log.trace 'locking access to telnet service'
@@ -51,14 +55,13 @@ class SmsService {
                 telnetService.connect()
                 telnetService.privMode(true)
 
-                pdus.each {
-                    def key = it.split(',')[1]
-                    mapPdu[key] = '-1'
-                    mapPdu[key] = sendPdu(it, channel)
+                lstPdu.each {
+                    it.refNo = sendPdu(it.pdu, channel)
                 }
+
                 log.trace '<< sendSms'
             } catch (Exception e) {
-                log.error "Exception sending sms: ${e.stackTrace}"
+                log.error "Exception sending sms: ${e.message}"
             } finally {
                 telnetService.disconnect()
 
@@ -67,10 +70,10 @@ class SmsService {
             }
         }
 
-        return mapPdu
+        return lstPdu
     }
 
-    Map<String, Integer> sendSms(String addr, String txt) {
+    List<Pdu> sendSms(String addr, String txt) {
         return sendSms(new Sms(addr, txt))
     }
 
@@ -100,8 +103,7 @@ class SmsService {
                 log.debug res
 
                 if (res.contains('*smserr')) {
-                    log.warn "modem failed to send pdu, adding to retry list"
-                    resendQueue.add(Collections.singletonMap(pdu, channel))
+                    log.warn "modem failed to send pdu"
                     bRun = false
 
                 } else if (res.contains('*smsout')) {
@@ -114,25 +116,24 @@ class SmsService {
             }
         } catch (Exception e) {
             log.error "Exception ${e.message} sending pdu"
-
-            log.trace 'adding pdu to resend queue'
-            resendQueue.add(Collections.singletonMap(pdu, channel))
         }
 
         log.trace '<< sendPdu'
         return refNo
     }
 
-    Map<String, Integer> resendPdu() {
+    List<Pdu> resendPdu() {
         log.trace '>> resendPdu'
 
-        Map<String, Integer> resendMap = new HashMap<>()
+        List<Pdu> lstPdu = new ArrayList<>(resendQueue)
 
         if (resendQueue.size() > 0) {
-            log.trace 'moving elements from resend queue into a local copy'
-            Queue<Map<String, Integer>> queue = new LinkedList<>()
-            queue.addAll(resendQueue)
-            resendQueue.clear()
+            log.info "${lstPdu.size()} PDUs to resend"
+
+            log.debug "$lstPdu"
+            synchronized (this) {
+                resendQueue.clear()
+            }
 
             log.trace 'locking access to telnet service'
             lock.lock()
@@ -141,17 +142,15 @@ class SmsService {
                 telnetService.privMode(true)
 
                 log.info 'resending PDUs'
-                queue.each {
-                    map -> map.each {
-                        String pdu, Integer channel ->
-                            try {
-                                resendMap << [pdu: sendPdu(pdu, channel)]
-                            } catch(Exception e) {
-                                    log.error "exception resending PDU: ${e.message}"
-                                    resendQueue.add(Collections.singletonMap(pdu, channel))
-                            }
+                lstPdu.each {
+                    try {
+                        it.refNo = sendPdu(it.pdu, it.channel)
+                    } catch (Exception e) {
+                        log.error "exception resending PDU: ${e.message}"
                     }
                 }
+            } catch (Exception e) {
+                log.error "Exception resending PDU: $e.message"
             } finally {
                 telnetService.disconnect()
 
@@ -162,8 +161,9 @@ class SmsService {
             log.info 'resend queue is empty'
         }
 
+        log.info "${lstPdu.findAll({it.refNo > 0}).size()} PDUs were successfully resent"
         log.trace '<< resendPdu'
-        return resendMap
+        return lstPdu
     }
 
     public List<Sms> getNewSms() {
@@ -370,7 +370,7 @@ class SmsService {
             throw new TelnetServiceException(invChannel)
         }
 
-        def cmd = "AT^SR=$channel.$idx"
+        def cmd = "AT^SR=$channel,$idx"
         telnetService.write cmd
 
         // read until *smserr, *smspdu or exception

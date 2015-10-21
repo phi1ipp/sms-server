@@ -36,6 +36,9 @@ class TelnetService {
             String strLogin = 'login: '
             String strPwd = 'Password: '
 
+            //set timeout
+            tc.setConnectTimeout(500)
+
             log.trace 'connecting'
             tc.connect(cfg.host, cfg.port)
 
