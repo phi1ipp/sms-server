@@ -212,7 +212,7 @@ class MailerService {
 
             msg.setSubject(subj)
 
-            msg.setContent(text, 'text/html; charset=utf-8')
+            msg.setContent(text.replaceAll('\n', '<br>'), 'text/html; charset=utf-8')
 
             Transport.send(msg)
 

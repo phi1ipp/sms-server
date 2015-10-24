@@ -6,5 +6,5 @@ import org.springframework.data.repository.CrudRepository
 interface PduRepository extends CrudRepository<Pdu, Long> {
     List<Pdu> findByPdu(String aPdu)
     List<Pdu> findBySmsId(long anId)
-    List<Pdu> findByRefNo(int refNo)
+    List<Pdu> findByRefNoAndChannel(int refNo, int chan)
 }

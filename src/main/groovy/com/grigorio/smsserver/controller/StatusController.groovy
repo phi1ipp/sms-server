@@ -29,6 +29,7 @@ class StatusController {
         model.addAttribute('smsList', smsList)
         model.addAttribute('depth', depth)
 
+        log.trace '<< showStatus'
         return 'current'
     }
 }

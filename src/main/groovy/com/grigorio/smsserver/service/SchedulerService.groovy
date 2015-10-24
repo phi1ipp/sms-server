@@ -55,7 +55,7 @@ class SchedulerService {
         if (smsList.size() > 0) {
             log.trace 'processing incoming sms'
             smsList.findAll { !(it instanceof StatusReportSms) }.each {
-                log.trace 'pulling a history of communications'
+                log.trace 'pulling a history of communications for ' + it.address
 
                 List<Sms> history
 
@@ -84,24 +84,24 @@ class SchedulerService {
             log.trace 'processing status reports'
             smsList.findAll { it instanceof StatusReportSms }.each {
                 sms ->
-                    log.debug "addr: ${sms.address} refNo: ${sms.refNo}"
+                    log.debug "addr: ${sms.address} refNo: ${sms.refNo} chan: $sms.channel"
 
                     List<Pdu> savedPdus
 
                     try {
-                        savedPdus = pduRepository.findByRefNo(sms.refNo)
+                        savedPdus = pduRepository.findByRefNoAndChannel(sms.refNo, sms.channel)
                     } catch (SQLException e) {
                         log.error "exception pulling information from DB: ${e.message}"
 
-                        savedPdus = pduRepository.findByRefNo(sms.refNo)
+                        savedPdus = pduRepository.findByRefNoAndChannel(sms.refNo, sms.channel)
                     }
 
-                    log.debug "list of PDUs with refNo: $sms.refNo in repo: $savedPdus"
+                    log.debug "list of PDUs with refNo: $sms.refNo and chan: $sms.channel in repo: $savedPdus"
 
                     if (savedPdus.size() < 1) {
-                        log.error "can't find pdu with ref# $sms.refNo in DB"
+                        log.error "can't find pdu with ref# $sms.refNo and chan: $sms.channel in DB"
                     } else if (savedPdus.size() > 1) {
-                        log.error "more than one pdu in DB with ref# $sms.refNo"
+                        log.error "more than one pdu in DB with ref# $sms.refNo and chan: $sms.channel"
                     } else {
                         Pdu pdu = savedPdus.get(0)
                         pdu.status = 'd'

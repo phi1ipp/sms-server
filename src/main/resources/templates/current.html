@@ -14,7 +14,7 @@
     <tr th:each="sms : ${smsList}">
         <td th:text="${sms.ts}">TS</td>
         <td th:text="${sms.address}">Address</td>
-        <td th:text="${sms.txt}">Text</td>
+        <td th:text="${#strings.trim(sms.txt)}">Text</td>
         <td th:switch="${sms.status}">
             <div th:case="'d'">Доставлено</div>
             <div th:case="'u'">Не доставлено</div>

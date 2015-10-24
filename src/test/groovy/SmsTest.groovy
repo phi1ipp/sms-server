@@ -175,4 +175,9 @@ class SmsTest {
         println new Sms('79168492412', 'test').toRawPdu('+79168492412')
         println new Sms('79168492412', 'test').toRawPdu('+79168492412')
     }
+
+    @Test
+    void ttt() {
+        println 'a\nb'.replaceAll('\n', '<br>')
+    }
 }

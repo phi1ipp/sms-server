@@ -39,6 +39,7 @@ class Sms {
     int parts = 0
 
     @Transient int iValidHours
+    @Transient int channel
 
     public Sms(String address, String txt) {
 
@@ -169,6 +170,7 @@ class Sms {
                 .append(' ref#: ').append(refNo)
                 .append(' Date: ').append(ts.toString())
                 .append(' Status: ').append(status)
+                .append(' Channel: ').append(channel)
                 .append(']').toString()
     }
 
@@ -204,7 +206,12 @@ class Sms {
 
     Sms setStatus(char status) {
         this.status = status
-        return this
+        this
+    }
+
+    Sms setChannel(int channel) {
+        this.channel = channel
+        this
     }
 
     public Sms valid(int iHours) {

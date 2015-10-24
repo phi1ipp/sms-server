@@ -228,6 +228,7 @@ class SmsService {
                             .valueOf(rawPdu)
                             .setStatus('i' as char)
                             .setIncoming(true)
+                            .setChannel(channel)
                     )
 
                     deleteSms(channel, it.key)
