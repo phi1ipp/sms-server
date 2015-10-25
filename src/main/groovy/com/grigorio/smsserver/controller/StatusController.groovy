@@ -33,7 +33,7 @@ class StatusController {
         model.addAttribute('depth', depth)
 
         log.trace '<< showStatus'
-        return 'current'
+        return 'current_new'
     }
 
     /**

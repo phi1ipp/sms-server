@@ -1,30 +1,30 @@
 <!DOCTYPE html>
         <html xmlns:th="http://www.thymeleaf.org">
 <head>
-    <link href="/css/style.css" th:href="@{/css/style.css}" rel="stylesheet"/>
+    <link href="/css/blueTable.css" th:href="@{/css/blueTable.css}" rel="stylesheet"/>
 </head>
 <body>
 <h1 align="center">Статистика СМС за <span th:text="${month}">Октябрь</span></h1>
-<table>
-    <thead>
-    <tr>
-        <th>Статус</th>
-        <th>Количество сообщений</th>
-        <th>Количество СМС</th>
-    </tr>
-    </thead>
-    <tbody>
-    <tr th:each="row : ${stat}">
-        <td th:switch="${row[0]}">
-            <div th:case="'d'">Доставлено</div>
-            <div th:case="'u'">Неизвестно</div>
-            <div th:case="'i'">Входящие</div>
-            <div th:case="'s'">Отправлено</div>
-        </td>
-        <td th:text="${row[1]}">Count</td>
-        <td th:text="${row[2]}">Parts</td>
-    </tr>
-    </tbody>
-</table>
+<div class="blueTable">
+    <table>
+        <tbody>
+        <tr>
+            <td>Статус</td>
+            <td>Количество сообщений</td>
+            <td>Количество СМС</td>
+        </tr>
+        <tr th:each="row : ${stat}">
+            <td th:switch="${row[0]}">
+                <div th:case="'d'">Доставлено</div>
+                <div th:case="'u'">Неизвестно</div>
+                <div th:case="'i'">Входящие</div>
+                <div th:case="'s'">Отправлено</div>
+            </td>
+            <td th:text="${row[1]}">Count</td>
+            <td th:text="${row[2]}">Parts</td>
+        </tr>
+        </tbody>
+    </table>
+</div>
 </body>
 </html>
