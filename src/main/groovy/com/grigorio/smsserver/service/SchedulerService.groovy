@@ -55,30 +55,38 @@ class SchedulerService {
         if (smsList.size() > 0) {
             log.trace 'processing incoming sms'
             smsList.findAll { !(it instanceof StatusReportSms) }.each {
-                log.trace 'pulling a history of communications for ' + it.address
 
-                List<Sms> history
+                List<Sms> history = []
 
-                try {
-                    history =
-                            smsRepository.findByAddressAndTsAfterOrderByTsDesc(
-                                    it.address, LocalDateTime.now().minusDays(appCfg.historyDepth))
-                } catch (SQLException e) {
-                    log.error "exception getting history from DB: ${e.message}"
+                // check ignore list to avoid saving/pulling history
+                if (it.address in appCfg.ignoreHistoryFor) {
+                    log.info "address $it.address is in ignore list"
+                } else {
+                    log.trace 'pulling a history of communications for ' + it.address
 
-                    history =
-                            smsRepository.findByAddressAndTsAfterOrderByTsDesc(
-                                    it.address, LocalDateTime.now().minusDays(appCfg.historyDepth))
+                    try {
+                        history =
+                                smsRepository.findByAddressAndTsAfterOrderByTsDesc(
+                                        it.address, LocalDateTime.now().minusDays(appCfg.historyDepth))
+                    } catch (SQLException e) {
+                        log.error "exception getting history from DB: ${e.message}"
+
+                        history =
+                                smsRepository.findByAddressAndTsAfterOrderByTsDesc(
+                                        it.address, LocalDateTime.now().minusDays(appCfg.historyDepth))
+                    }
+
+                    log.debug "sms history: $history"
+
+                    log.trace 'saving sms into db'
+                    smsRepository.save(it.setIncoming(true))
                 }
 
-                log.debug "sms history: $history"
+                log.trace 'adding SMS to the beginning of the history for mailing'
                 history.add(0, it.setIncoming(true))
 
-                log.trace 'sending an email'
+                log.trace 'sending an email with history'
                 mailerService.sendHistory(mailerService.cfg.forward, history)
-
-                log.trace 'saving sms into db'
-                smsRepository.save(it.setIncoming(true))
             }
 
             log.trace 'processing status reports'

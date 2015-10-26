@@ -30,8 +30,6 @@ import static com.grigorio.smsserver.exception.MailerServiceException.Reason.*
 @EnableConfigurationProperties(MailerServiceConfig.class)
 class MailerService {
 
-    //todo add sending  mail
-
     @Autowired
     MailerServiceConfig cfg
 
@@ -57,7 +55,7 @@ class MailerService {
             protected PasswordAuthentication getPasswordAuthentication() {
                 return new PasswordAuthentication(cfg.user, cfg.password)
             }
-        })
+        } as Authenticator)
 
         log.trace 'getting store'
         store = session.getStore('imap')
