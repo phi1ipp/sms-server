@@ -2,25 +2,31 @@
         <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <link href="/css/blueTable.css" th:href="@{/css/blueTable.css}" rel="stylesheet"/>
+    <title>Текущий статус отправленных СМС</title>
 </head>
 <body>
-<h1 align="center">Текущий статус отправленных СМС за последние <span th:text="${depth}">2</span> дня</h1>
 <div class="blueTable">
     <table>
+        <thead>
+        <tr>
+            <th colspan="4">Текущий статус отправленных СМС за последние <span th:text="${depth}"></span> дня</th>
+        </tr>
+        </thead>
         <tbody>
         <tr>
-            <td>Дата/время</td>
+            <td>Время</td>
             <td>Абонент</td>
             <td>Текст сообщения</td>
             <td>Статус</td>
         </tr>
         <tr th:each="sms : ${smsList}">
-            <td th:text="${sms.ts}">TS</td>
+            <td th:text="${{sms.ts}}">TS</td>
             <td th:text="${sms.address}">Address</td>
-            <td th:utext="${#strings.concat('&lt;pre&gt;', sms.txt, '&lt;/pre&gt;')}"><pre>Text</pre></td>
+            <td th:utext="${sms.txt}"><pre>Text</pre></td>
             <td th:switch="${sms.status}">
                 <div th:case="'d'">Доставлено</div>
                 <div th:case="'u'">Не доставлено</div>
+                <div th:case="'s'">Передано оператору</div>
             </td>
         </tr>
         </tbody>

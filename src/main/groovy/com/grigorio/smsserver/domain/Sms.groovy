@@ -9,6 +9,7 @@ import org.ajwcc.pduUtils.gsm3040.SmsStatusReportPdu
 import org.apache.commons.codec.binary.Hex
 import org.smslib.Message
 import org.smslib.OutboundMessage
+import org.springframework.format.annotation.DateTimeFormat
 
 import javax.persistence.Entity
 import javax.persistence.GeneratedValue
@@ -31,6 +32,7 @@ class Sms {
     long id
 
     String address, txt
+    @DateTimeFormat(pattern = 'yyyy-MM-dd\nHH:mm:ss')
     LocalDateTime ts
 
     int refNo
