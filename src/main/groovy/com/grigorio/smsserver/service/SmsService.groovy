@@ -157,11 +157,13 @@ class SmsService {
                 log.trace 'unlocking access to telnet service'
                 lock.unlock()
             }
+
+            log.info "${lstPdu.findAll({it.refNo > -1}).size()} PDUs were successfully resent"
+
         } else {
             log.info 'resend queue is empty'
         }
 
-        log.info "${lstPdu.findAll({it.refNo > 0}).size()} PDUs were successfully resent"
         log.trace '<< resendPdu'
         return lstPdu
     }

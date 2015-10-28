@@ -10,7 +10,9 @@ interface PduRepository extends CrudRepository<Pdu, Long> {
     List<Pdu> findBySmsId(long anId)
     List<Pdu> findByRefNoAndChannel(int refNo, int chan)
 
-    @Query(value = "select * from pdu where sms_id in (select id from sms where now() > date_add(ts, interval :hrs hour))",
+    @Query(value = "select p.* \
+                    from pdu p join sms s on p.sms_id = s.id \
+                    where now() > date_add(s.ts, interval :hrs hour)",
         nativeQuery = true)
     List<Pdu> findExpired(@Param('hrs') int hrs)
 }
