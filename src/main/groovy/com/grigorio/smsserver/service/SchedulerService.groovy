@@ -8,6 +8,7 @@ import com.grigorio.smsserver.repository.PduRepository
 import com.grigorio.smsserver.repository.SmsRepository
 import groovy.util.logging.Slf4j
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.context.MessageSource
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 
@@ -34,6 +35,9 @@ class SchedulerService {
 
     @Autowired
     ApplicationConfig appCfg
+
+    @Autowired
+    MessageSource msgSrc
 
     @Scheduled(fixedDelay = 30000l)
     void checkInboxAndModem() {
@@ -175,6 +179,59 @@ class SchedulerService {
         }
 
         log.trace '<< resendFailedPdus'
+    }
+
+    @Scheduled(fixedDelay = 60000l)
+    void processExpiredMessages() {
+        log.trace '>> processExpiredMessages'
+
+        log.trace 'searching for expired PDUs'
+        List<Pdu> expired = pduRepository.findExpired(smsService.cfg.validHours)
+        log.debug "expired: $expired"
+
+        if (expired.size() > 0) {
+            log.trace 'setting sms status to NON-DELIVERED'
+
+            log.trace 'loading email template'
+            String strText = msgSrc.getMessage('mailer.nondelivered.text', null, Locale.default)
+            log.debug "email template: $strText"
+
+            expired
+                    .groupBy { pdu -> pdu.smsId }
+                    .each {
+                        Sms sms = smsRepository.findOne(it.key)
+                        log.debug "sms: $sms"
+
+                        if (sms != null) {
+                            sms.status = 'n'
+                            smsRepository.save(sms)
+                        }
+                        else
+                            log.warning "sms with id: $sms.id not found in DB"
+
+                        log.info "sms marked as NON-DELIVERED: $sms "
+
+                        log.trace 'preparing to send an email'
+
+                        String strMsg = String.format(strText, sms.address, sms.ts)
+                        log.debug "message to send: $strMsg"
+
+                        log.trace 'sending the email'
+                        mailerService.sendMail(
+                                mailerService.cfg.forward,
+                                msgSrc.getMessage('mailer.nondelivered.subj', null, Locale.default),
+                                strMsg)
+                    }
+
+            log.trace 'deleting expired PDUs'
+            expired.each {
+                pdu ->
+                    pduRepository.delete(pdu.id)
+                    log.info "pdu deleted from DB: $pdu"
+            }
+        }
+
+        log.trace '<< processExpiredMessages'
     }
 
     // every hour ping DB to avoid timeouts

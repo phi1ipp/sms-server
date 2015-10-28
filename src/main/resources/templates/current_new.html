@@ -2,31 +2,32 @@
         <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <link href="/css/blueTable.css" th:href="@{/css/blueTable.css}" rel="stylesheet"/>
-    <title>Текущий статус отправленных СМС</title>
+    <title th:text="#{status.title}">Current status of sent SMS</title>
 </head>
 <body>
 <div class="blueTable">
     <table>
         <thead>
         <tr>
-            <th colspan="4">Текущий статус отправленных СМС за последние <span th:text="${depth}"></span> дня</th>
+            <th colspan="4" th:text="#{status.th.1} + | ${depth} | + #{status.th.2}">Current status of SMS sent for the last 2 days</th>
         </tr>
         </thead>
         <tbody>
         <tr>
-            <td>Время</td>
-            <td>Абонент</td>
-            <td>Текст сообщения</td>
-            <td>Статус</td>
+            <td th:text="#{status.col.datetime}">Timestamp</td>
+            <td th:text="#{status.col.address}">Address</td>
+            <td th:text="#{status.col.text}">Text</td>
+            <td th:text="#{status.col.status}">Status</td>
         </tr>
         <tr th:each="sms : ${smsList}">
             <td th:text="${{sms.ts}}">TS</td>
             <td th:text="${sms.address}">Address</td>
             <td th:utext="${sms.txt}"><pre>Text</pre></td>
             <td th:switch="${sms.status}">
-                <div th:case="'d'">Доставлено</div>
-                <div th:case="'u'">Не доставлено</div>
-                <div th:case="'s'">Передано оператору</div>
+                <p th:case="'d'" th:text="#{status.d}">Delivered</p>
+                <p th:case="'n'" th:text="#{status.n}">Non-Delivered</p>
+                <p th:case="'u'" th:text="#{status.u}">Unknown</p>
+                <p th:case="'s'" th:text="#{status.s}">Sent</p>
             </td>
         </tr>
         </tbody>

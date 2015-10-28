@@ -15,10 +15,11 @@
         </tr>
         <tr th:each="row : ${stat}">
             <td th:switch="${row[0]}">
-                <div th:case="'d'">Доставлено</div>
-                <div th:case="'u'">Неизвестно</div>
-                <div th:case="'i'">Входящие</div>
-                <div th:case="'s'">Отправлено</div>
+                <p th:case="'d'" th:text="#{status.d}">Delivered</p>
+                <p th:case="'n'" th:text="#{status.n}">Non-delivered</p>
+                <p th:case="'u'" th:text="#{status.u}">Unknown</p>
+                <p th:case="'s'" th:text="#{status.s}">Sent</p>
+                <p th:case="'i'" th:text="#{status.i}">Inbound</p>
             </td>
             <td th:text="${row[1]}">Count</td>
             <td th:text="${row[2]}">Parts</td>
