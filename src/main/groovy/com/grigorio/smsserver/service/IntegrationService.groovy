@@ -26,6 +26,8 @@ class IntegrationService {
 
         List<Pdu> lstPdu = smsService.sendSms(sms)
 
+        log.debug "lstPdu after sending the message: $lstPdu"
+
         sms.parts = lstPdu.size()
 
         // if every PDU sent
@@ -45,7 +47,11 @@ class IntegrationService {
 
         // adding failed PDUs into the resend queue
         synchronized (smsService) {
+            log.trace 'adding PDUs into the resend queue'
+
+            log.debug "resend queue before: $smsService.resendQueue"
             smsService.resendQueue.addAll(lstPdu.findAll { it -> it.refNo == -1 })
+            log.debug "resend queue after: $smsService.resendQueue"
         }
 
         log.trace '<< sendSms'

@@ -154,7 +154,9 @@ class SchedulerService {
 
         List<Pdu> lstPdu = smsService.resendPdu()
 
-        lstPdu.findAll { it.refNo > 0 }
+        log.debug "lstPdu after resending: $lstPdu"
+
+        lstPdu.findAll { it.refNo > -1 }
                 .each {
                     pdu ->
                         List<Pdu> savedPdu = pduRepository.findByPdu(pdu.pdu)
@@ -186,6 +188,7 @@ class SchedulerService {
         log.trace '>> processExpiredMessages'
 
         log.trace 'searching for expired PDUs'
+        log.debug "expiration time: $smsService.cfg.validHours"
         List<Pdu> expired = pduRepository.findExpired(smsService.cfg.validHours)
         log.debug "expired: $expired"
 
