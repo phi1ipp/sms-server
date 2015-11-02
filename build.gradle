@@ -1,5 +1,5 @@
 group 'com.grigorio'
-version '1.0.11-SNAPSHOT'
+version '1.0.12-SNAPSHOT'
 
 buildscript {
     repositories {
@@ -7,9 +7,10 @@ buildscript {
     }
 
     dependencies {
-        classpath("org.springframework.boot:spring-boot-gradle-plugin:1.2.7.RELEASE")
+        classpath "org.springframework.boot:spring-boot-gradle-plugin:1.2.7.RELEASE"
     }
 }
+
 apply plugin: 'groovy'
 apply plugin: 'java'
 apply plugin: 'spring-boot'

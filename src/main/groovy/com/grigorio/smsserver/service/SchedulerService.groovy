@@ -216,7 +216,7 @@ class SchedulerService {
 
                         log.trace 'preparing to send an email'
 
-                        String strMsg = String.format(strText, sms.address, sms.ts)
+                        String strMsg = String.format(strText, sms.address, sms.ts, sms.txt.replaceAll('\n', '<br>'))
                         log.debug "message to send: $strMsg"
 
                         log.trace 'sending the email'
