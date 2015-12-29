@@ -196,6 +196,9 @@ class SchedulerService {
             log.trace 'setting sms status to NON-DELIVERED'
 
             log.trace 'loading email template'
+            String strSubjTemplate = msgSrc.getMessage('mailer.nondelivered.subj', null, Locale.default)
+            log.debug "template for a subject line: $strSubjTemplate"
+
             String strText = msgSrc.getMessage('mailer.nondelivered.text', null, Locale.default)
             log.debug "email template: $strText"
 
@@ -216,14 +219,17 @@ class SchedulerService {
 
                         log.trace 'preparing to send an email'
 
+                        String strSubj = String.format(strSubjTemplate, sms.address)
+                        log.debug "subject line: $strSubj"
+
+                        //preparing text
                         String strMsg = String.format(strText, sms.address, sms.ts, sms.txt.replaceAll('\n', '<br>'))
                         log.debug "message to send: $strMsg"
 
                         log.trace 'sending the email'
                         mailerService.sendMail(
                                 mailerService.cfg.forward,
-                                msgSrc.getMessage('mailer.nondelivered.subj', null, Locale.default),
-                                strMsg)
+                                strSubj, strMsg)
                     }
 
             log.trace 'deleting expired PDUs'
