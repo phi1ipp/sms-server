@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <link href="/css/blueTable.css" th:href="@{/css/blueTable.css}" rel="stylesheet"/>
+</head>
+<body>
+<h1 align="center">Статистика СМС за <span th:text="${month}">Октябрь</span> <span th:text="${year}">2016</span> года</h1>
+<div class="blueTable">
+    <table>
+        <tbody>
+        <tr>
+            <td>Статус</td>
+            <td>Количество сообщений</td>
+            <td>Количество СМС</td>
+        </tr>
+        <tr th:each="row : ${stat}">
+            <td th:switch="${row[0]}">
+                <p th:case="'d'" th:text="#{status.d}">Delivered</p>
+                <p th:case="'n'" th:text="#{status.n}">Non-delivered</p>
+                <p th:case="'u'" th:text="#{status.u}">Unknown</p>
+                <p th:case="'s'" th:text="#{status.s}">Sent</p>
+                <p th:case="'i'" th:text="#{status.i}">Inbound</p>
+            </td>
+            <td th:text="${row[1]}">Count</td>
+            <td th:text="${row[2]}">Parts</td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

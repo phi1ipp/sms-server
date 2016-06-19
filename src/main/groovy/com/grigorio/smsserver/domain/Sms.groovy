@@ -200,7 +200,7 @@ class Sms {
 
         // if addresses not in a required format, try to guess and fix
         if (!matcher.matches())
-            if (address.toCharArray().each {it.isDigit()} && address.length() == 11)
+            if (address.toCharArray().each {it.isDigit()})
                 address = '+' + address
 
         address

@@ -9,4 +9,5 @@ class SmsServiceConfig {
     String smsc
     int validHours
     int[] channels
+    String[] numbers
 }

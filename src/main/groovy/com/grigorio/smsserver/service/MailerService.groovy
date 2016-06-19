@@ -223,6 +223,35 @@ class MailerService {
         log.trace '<< sendMail'
     }
 
+    void sendHistoryFrom(String from, String to, List<Sms> history) {
+        log.trace '>> sendHistory'
+        StringBuilder sb = new StringBuilder('<html><body>')
+
+        log.trace 'searching history for an agent last talking'
+        Sms smsForAgent = history.find {!it.incoming}
+
+        String agent = ''
+        if (smsForAgent != null && smsForAgent.txt.contains('//'))
+            agent = smsForAgent.txt.substring(smsForAgent.txt.lastIndexOf('//') + 2)
+
+        log.trace 'performing history formatting'
+        history.each {
+            if (it.incoming) {
+                sb.append('<hr><font color="blue"><b>Получено</b> ').append(it.ts).append('<br>').append(it.txt)
+            } else {
+                sb.append('<hr><font color="red"><b>Отправлено</b> ').append(it.ts).append('<br>').append(it.txt)
+            }
+        }
+
+        sb.append('</body></hmtl>')
+
+        log.trace 'sending email with the history'
+        //removing leading + from a phone number as per request
+        sendMail(to, "SMS ${from} переписка с абонентом ${history.get(0).address[1..-1]} - $agent", sb.toString())
+
+        log.trace '<< sendHistory'
+    }
+
     void sendHistory(String to, List<Sms> history) {
         log.trace '>> sendHistory'
         StringBuilder sb = new StringBuilder('<html><body>')
@@ -246,7 +275,8 @@ class MailerService {
         sb.append('</body></hmtl>')
 
         log.trace 'sending email with the history'
-        sendMail(to, "SMS переписка с абонентом ${history.get(0).address} - $agent", sb.toString())
+        //removing leading + from a phone number as per request
+        sendMail(to, "SMS переписка с абонентом ${history.get(0).address[1..-1]} - $agent", sb.toString())
 
         log.trace '<< sendHistory'
     }

@@ -204,6 +204,41 @@ class SmsService {
         res
     }
 
+    public Map<Integer, List<Sms>> getNewSmsMap() {
+        log.trace '>> getNewSmsMap'
+
+        Map<Integer, List<Sms>> res = [:]
+
+        synchronized (this) {
+            log.trace 'locking access to telnet service'
+            lock.lock()
+
+            try {
+                telnetService.connect()
+                telnetService.privMode(true)
+
+                cfg.channels.each {
+                    def tmp = getNewSmsFromChannel(it)
+
+                    log.debug "list from channel $it: $tmp"
+
+                    res[it] = tmp
+                    log.debug "res: $res"
+                }
+            } catch (Exception e) {
+                log.error "Exception getting new SMS: ${e.message}"
+            } finally {
+                telnetService.disconnect()
+
+                log.trace 'unlocking access to telnet service'
+                lock.unlock()
+            }
+        }
+
+        log.trace '<< getNewSmsMap'
+        res
+    }
+
     private List<Sms> getNewSmsFromChannel(int channel) {
         log.trace '>> getNewSmsFromChannel'
         log.debug "getNewSmsFromChannel with $channel"

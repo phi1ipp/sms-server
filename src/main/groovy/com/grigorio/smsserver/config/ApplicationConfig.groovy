@@ -4,6 +4,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 
 @ConfigurationProperties
 class ApplicationConfig {
-    int historyDepth
+    int historyDepth, keepSmsForDays
     String[] ignoreHistoryFor
 }

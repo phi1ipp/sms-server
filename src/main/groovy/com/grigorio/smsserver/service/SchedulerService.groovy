@@ -45,7 +45,7 @@ class SchedulerService {
 
         log.trace 'checking mailbox'
         List<Sms> smsList = mailerService.getSmsList()
-        log.info "number of sms to send: ${smsList.size()}"
+        log.info "number of sms to send in INBOX: ${smsList.size()}"
 
         smsList.each {
             log.trace "sending SMS: $it"
@@ -53,95 +53,106 @@ class SchedulerService {
         }
 
         log.trace 'checking new sms'
-        smsList = smsService.getNewSms()
-        log.info "number of new sms to send in INBOX: ${smsList.size()}"
+        Map<Integer, List<Sms>> mapSms = smsService.getNewSmsMap()
+//        smsList = smsService.getNewSms()
+        // calculating number of sms on each channel
+        log.info "number of new received sms by channel: ${mapSms.collectEntries { key, value -> [key, value.size()]}}"
 
-        if (smsList.size() > 0) {
-            log.trace 'processing incoming sms'
-            smsList.findAll { !(it instanceof StatusReportSms) }.each {
+        // if there is sms on any channel
+        if (mapSms.any { key, value -> value.size() > 0})
+        {
+            // for every non-empty channel
+            mapSms.findAll { key, value -> value.size() > 0 }.each {
+                smsList = it.value
+                int chan = it.key
 
-                List<Sms> history = []
+                log.trace 'processing incoming sms'
+                smsList.findAll { !(it instanceof StatusReportSms) }.each {
 
-                // check ignore list to avoid saving/pulling history
-                if (it.address in appCfg.ignoreHistoryFor) {
-                    log.info "address $it.address is in ignore list"
-                } else {
-                    log.trace 'pulling a history of communications for ' + it.address
+                    List<Sms> history = []
 
-                    try {
-                        history =
-                                smsRepository.findByAddressAndTsAfterOrderByTsDesc(
-                                        it.address, LocalDateTime.now().minusDays(appCfg.historyDepth))
-                    } catch (SQLException e) {
-                        log.error "exception getting history from DB: ${e.message}"
+                    // check ignore list to avoid saving/pulling history
+                    if (it.address in appCfg.ignoreHistoryFor) {
+                        log.info "address $it.address is in ignore list"
+                    } else {
+                        log.trace 'pulling a history of communications for ' + it.address
 
-                        history =
-                                smsRepository.findByAddressAndTsAfterOrderByTsDesc(
-                                        it.address, LocalDateTime.now().minusDays(appCfg.historyDepth))
+                        try {
+                            history =
+                                    smsRepository.findByAddressAndTsAfterOrderByTsDesc(
+                                            it.address, LocalDateTime.now().minusDays(appCfg.historyDepth))
+                        } catch (SQLException e) {
+                            log.error "exception getting history from DB: ${e.message}"
+
+                            history =
+                                    smsRepository.findByAddressAndTsAfterOrderByTsDesc(
+                                            it.address, LocalDateTime.now().minusDays(appCfg.historyDepth))
+                        }
+
+                        log.debug "sms history: $history"
+
+                        log.trace 'saving sms into db'
+                        smsRepository.save(it.setIncoming(true))
                     }
 
-                    log.debug "sms history: $history"
+                    log.trace 'adding SMS to the beginning of the history for mailing'
+                    history.add(0, it.setIncoming(true))
 
-                    log.trace 'saving sms into db'
-                    smsRepository.save(it.setIncoming(true))
+                    log.trace 'sending an email with history'
+//                    mailerService.sendHistory(mailerService.cfg.forward, history)
+                    mailerService.sendHistoryFrom(smsService.cfg.numbers[chan], mailerService.cfg.forward, history)
                 }
 
-                log.trace 'adding SMS to the beginning of the history for mailing'
-                history.add(0, it.setIncoming(true))
+                log.trace 'processing status reports'
+                smsList.findAll { it instanceof StatusReportSms }.each {
+                    sms ->
+                        log.debug "addr: ${sms.address} refNo: ${sms.refNo} chan: $sms.channel"
 
-                log.trace 'sending an email with history'
-                mailerService.sendHistory(mailerService.cfg.forward, history)
-            }
+                        List<Pdu> savedPdus
 
-            log.trace 'processing status reports'
-            smsList.findAll { it instanceof StatusReportSms }.each {
-                sms ->
-                    log.debug "addr: ${sms.address} refNo: ${sms.refNo} chan: $sms.channel"
+                        try {
+                            savedPdus = pduRepository.findByRefNoAndChannel(sms.refNo, sms.channel)
+                        } catch (SQLException e) {
+                            log.error "exception pulling information from DB: ${e.message}"
 
-                    List<Pdu> savedPdus
-
-                    try {
-                        savedPdus = pduRepository.findByRefNoAndChannel(sms.refNo, sms.channel)
-                    } catch (SQLException e) {
-                        log.error "exception pulling information from DB: ${e.message}"
-
-                        savedPdus = pduRepository.findByRefNoAndChannel(sms.refNo, sms.channel)
-                    }
-
-                    log.debug "list of PDUs with refNo: $sms.refNo and chan: $sms.channel in repo: $savedPdus"
-
-                    if (savedPdus.size() < 1) {
-                        log.error "can't find pdu with ref# $sms.refNo and chan: $sms.channel in DB"
-                    } else if (savedPdus.size() > 1) {
-                        log.error "more than one pdu in DB with ref# $sms.refNo and chan: $sms.channel"
-                    } else {
-                        Pdu pdu = savedPdus.get(0)
-                        pdu.status = 'd'
-
-                        log.trace 'changing status of pdu to delivered in DB'
-                        pduRepository.save(pdu)
-
-                        long smsId = pdu.smsId
-                        log.debug "smsId: $smsId"
-
-                        List<Pdu> allPduForSMS = pduRepository.findBySmsId(smsId)
-
-                        log.trace 'checking if all PDUs for the sms are delivered'
-                        if (allPduForSMS.every { it.status == 'd' as char}) {
-                            log.info 'all PDUs are now delivered'
-
-                            log.trace 'deleting PDUs from DB'
-                            allPduForSMS.each {
-                                pduRepository.delete(it)
-                            }
-
-                            Sms theSMS = smsRepository.findOne(smsId)
-
-                            log.trace 'setting SMS status to delivered in DB'
-                            theSMS.status = 'd'
-                            smsRepository.save(theSMS)
+                            savedPdus = pduRepository.findByRefNoAndChannel(sms.refNo, sms.channel)
                         }
-                    }
+
+                        log.debug "list of PDUs with refNo: $sms.refNo and chan: $sms.channel in repo: $savedPdus"
+
+                        if (savedPdus.size() < 1) {
+                            log.error "can't find pdu with ref# $sms.refNo and chan: $sms.channel in DB"
+                        } else if (savedPdus.size() > 1) {
+                            log.error "more than one pdu in DB with ref# $sms.refNo and chan: $sms.channel"
+                        } else {
+                            Pdu pdu = savedPdus.get(0)
+                            pdu.status = 'd'
+
+                            log.trace 'changing status of pdu to delivered in DB'
+                            pduRepository.save(pdu)
+
+                            long smsId = pdu.smsId
+                            log.debug "smsId: $smsId"
+
+                            List<Pdu> allPduForSMS = pduRepository.findBySmsId(smsId)
+
+                            log.trace 'checking if all PDUs for the sms are delivered'
+                            if (allPduForSMS.every { it.status == 'd' as char}) {
+                                log.info 'all PDUs are now delivered'
+
+                                log.trace 'deleting PDUs from DB'
+                                allPduForSMS.each {
+                                    pduRepository.delete(it)
+                                }
+
+                                Sms theSMS = smsRepository.findOne(smsId)
+
+                                log.trace 'setting SMS status to delivered in DB'
+                                theSMS.status = 'd'
+                                smsRepository.save(theSMS)
+                            }
+                        }
+                }
             }
         }
 
@@ -250,6 +261,17 @@ class SchedulerService {
 
         log.debug "count sms in DB: ${smsRepository.count()}"
         log.trace '<< pingDB'
+    }
+
+    // every day clean old sms out of DB
+    @Scheduled(fixedRate = 86400000l)
+    void cleanOldSms() {
+        log.trace '>> cleanOldSms'
+        log.debug "time to keep sms = ${appCfg.keepSmsForDays}"
+
+        smsRepository.cleanOldSms(appCfg.keepSmsForDays)
+
+        log.trace '<< cleanOldSms'
     }
 }
 

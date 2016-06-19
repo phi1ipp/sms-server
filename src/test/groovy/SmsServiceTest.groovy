@@ -46,6 +46,11 @@ class SmsServiceTest {
     }
 
     @Test
+    void testGetNewSmsMap() {
+        println service.getNewSmsMap()
+    }
+
+    @Test
     void testSendSms() {
         println service.sendSms('+79175685589', 'Проверка связи, спи спокойно!')
     }
